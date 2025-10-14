@@ -1,2 +1,2 @@
 # organizando-fotos
-plicación de escritorio en Python para organizar archivos multimedia.
+Aplicación de escritorio en Python para organizar archivos multimedia.
