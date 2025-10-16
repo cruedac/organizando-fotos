@@ -1,0 +1,25 @@
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
+class Config:
+    # Configuración básica
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev')
+    
+    # Configuración de la base de datos
+    BASEDIR = os.path.abspath(os.path.dirname(__file__))
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(BASEDIR, 'data', 'multimedia.db')}"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Configuración de archivos
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+    UPLOAD_FOLDER = os.path.join(BASEDIR, 'uploads')
+    
+    # Extensiones permitidas (movidas desde create_db.py)
+    ALLOWED_EXTENSIONS = {
+        'image': {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic', '.svg', '.raw', '.cr2', '.cr3'},
+        'video': {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv'},
+        'audio': {'.mp3', '.wav', '.ogg', '.aac', '.flac'}
+    }

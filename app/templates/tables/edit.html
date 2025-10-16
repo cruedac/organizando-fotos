@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Tabla {{ table.name }} - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Editar Tabla: {{ table.name }}</h2>
+            <a href="{{ url_for('tables.add_field', table_id=table.id) }}" class="btn btn-primary">
+                Añadir Campo
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Información de la Tabla</h5>
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Nombre</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="name" 
+                                       value="{{ table.name }}"
+                                       readonly>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Descripción</label>
+                                <textarea class="form-control" 
+                                          id="description" 
+                                          name="description"
+                                          rows="3">{{ table.description or '' }}</textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Campos de la Tabla</h5>
+                        
+                        {% if table.fields %}
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Tipo</th>
+                                            <th>Requerido</th>
+                                            <th>Clave Primaria</th>
+                                            <th>Auto Incremento</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for field in table.fields %}
+                                        <tr>
+                                            <td>{{ field.name }}</td>
+                                            <td>{{ field.field_type }}</td>
+                                            <td>
+                                                {% if field.is_required %}
+                                                    <span class="badge bg-primary">Sí</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">No</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if field.is_primary_key %}
+                                                    <span class="badge bg-warning">Sí</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">No</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if field.is_auto_increment %}
+                                                    <span class="badge bg-info">Sí</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">No</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="{{ url_for('tables.edit_field', table_id=table.id, field_id=field.id) }}"
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        Editar
+                                                    </a>
+                                                    <form action="{{ url_for('tables.delete_field', table_id=table.id, field_id=field.id) }}"
+                                                          method="POST"
+                                                          style="display: inline;"
+                                                          onsubmit="return confirm('¿Estás seguro de que quieres eliminar este campo?');">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            Eliminar
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                Esta tabla no tiene campos. ¡Añade algunos campos para empezar!
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

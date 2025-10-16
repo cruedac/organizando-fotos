@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if field %}Editar{% else %}Añadir{% endif %} Campo - {{ table.name }}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    {% if field %}Editar{% else %}Añadir{% endif %} Campo
+                    <small class="text-muted">Tabla: {{ table.name }}</small>
+                </h3>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    {% if not field %}
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nombre del Campo</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="name" 
+                               name="name"
+                               pattern="[a-zA-Z][a-zA-Z0-9_]*"
+                               title="El nombre debe comenzar con una letra y solo puede contener letras, números y guiones bajos"
+                               required>
+                        <div class="form-text">
+                            El nombre debe comenzar con una letra y solo puede contener letras, 
+                            números y guiones bajos.
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="field_type" class="form-label">Tipo de Campo</label>
+                        <select class="form-select" id="field_type" name="field_type" required>
+                            <option value="">Seleccionar tipo...</option>
+                            {% for value, label in field_types %}
+                            <option value="{{ value }}"
+                                    {% if field and field.field_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="default_value" class="form-label">Valor por Defecto</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="default_value" 
+                               name="default_value"
+                               value="{{ field.default_value if field else '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="is_required" 
+                                   name="is_required"
+                                   {% if field and field.is_required %}checked{% endif %}>
+                            <label class="form-check-label" for="is_required">
+                                Campo Requerido
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="is_primary_key" 
+                                   name="is_primary_key"
+                                   {% if field and field.is_primary_key %}checked{% endif %}>
+                            <label class="form-check-label" for="is_primary_key">
+                                Clave Primaria
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="is_auto_increment" 
+                                   name="is_auto_increment"
+                                   {% if field and field.is_auto_increment %}checked{% endif %}>
+                            <label class="form-check-label" for="is_auto_increment">
+                                Auto Incremento
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <a href="{{ url_for('tables.edit_table', table_id=table.id) }}" 
+                           class="btn btn-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Tipos de Archivo - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Tipos de Archivo</h2>
+            <a href="{{ url_for('maintenance.add_file_type') }}" class="btn btn-primary">
+                Añadir Extensión
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Extensión</th>
+                                <th>Tipo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ext in extensions %}
+                            <tr>
+                                <td>{{ ext.extension }}</td>
+                                <td>
+                                    <span class="badge bg-{{ {
+                                        'image': 'primary',
+                                        'video': 'success',
+                                        'audio': 'info'
+                                    }[ext.type] }}">{{ ext.type }}</span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('maintenance.edit_file_type', id=ext.id) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Editar
+                                        </a>
+                                        <form action="{{ url_for('maintenance.delete_file_type', id=ext.id) }}"
+                                              method="POST"
+                                              style="display: inline;"
+                                              onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta extensión?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                Eliminar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

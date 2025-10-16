@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Seleccionar Carpeta</h5>
+                <div class="mb-3">
+                    <button class="btn btn-primary" id="selectFolder">
+                        Seleccionar Carpeta
+                    </button>
+                    <span class="ms-3" id="selectedPath"></span>
+                </div>
+                
+                <div id="results" class="mt-4" style="display: none;">
+                    <h6>Resultados del Escaneo:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Totales</h6>
+                                    <ul class="list-unstyled" id="totalsList">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Por Extensión</h6>
+                                    <ul class="list-unstyled" id="extensionList">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('selectFolder').addEventListener('click', async () => {
+    // En una aplicación web, necesitaremos usar el diálogo nativo del sistema
+    // a través de un input type="file" o una API de sistema de archivos
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    
+    input.onchange = async (e) => {
+        const folder = e.target.files[0].path;
+        document.getElementById('selectedPath').textContent = folder;
+        
+        try {
+            const response = await fetch('/api/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ folder_path: folder }),
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                displayResults(data);
+            } else {
+                alert('Error: ' + data.error);
+            }
+        } catch (error) {
+            alert('Error al escanear la carpeta: ' + error);
+        }
+    };
+    
+    input.click();
+});
+
+function displayResults(data) {
+    const results = document.getElementById('results');
+    const totalsList = document.getElementById('totalsList');
+    const extensionList = document.getElementById('extensionList');
+    
+    // Mostrar totales
+    totalsList.innerHTML = Object.entries(data.totals)
+        .map(([type, count]) => `<li><strong>${type}:</strong> ${count}</li>`)
+        .join('');
+    
+    // Mostrar desglose por extensión
+    extensionList.innerHTML = Object.entries(data.by_extension)
+        .sort(([,a], [,b]) => b - a) // Ordenar por cantidad
+        .map(([ext, count]) => `<li><strong>${ext}:</strong> ${count}</li>`)
+        .join('');
+    
+    results.style.display = 'block';
+}
+</script>
+{% endblock %}

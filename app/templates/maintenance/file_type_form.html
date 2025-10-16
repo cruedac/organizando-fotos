@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if file_type %}Editar{% else %}Añadir{% endif %} Tipo de Archivo - Organizador Multimedia
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    {% if file_type %}Editar{% else %}Añadir{% endif %} Tipo de Archivo
+                </h3>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="extension" class="form-label">Extensión</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="extension" 
+                               name="extension"
+                               value="{{ file_type.extension if file_type else '' }}"
+                               {% if file_type %}readonly{% endif %}
+                               required>
+                        <div class="form-text">Ejemplo: .jpg, .mp4, .mp3</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Tipo</label>
+                        <select class="form-select" id="type" name="type" required>
+                            <option value="">Seleccionar tipo...</option>
+                            <option value="image" 
+                                {% if file_type and file_type.type == 'image' %}selected{% endif %}>
+                                Imagen
+                            </option>
+                            <option value="video"
+                                {% if file_type and file_type.type == 'video' %}selected{% endif %}>
+                                Video
+                            </option>
+                            <option value="audio"
+                                {% if file_type and file_type.type == 'audio' %}selected{% endif %}>
+                                Audio
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <a href="{{ url_for('maintenance.file_types') }}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

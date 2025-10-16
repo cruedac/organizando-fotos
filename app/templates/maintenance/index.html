@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Mantenimiento - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Mantenimiento del Sistema</h2>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Tipos de Archivo</h5>
+                        <p class="card-text">Gestionar extensiones y tipos de archivo soportados.</p>
+                        <a href="{{ url_for('maintenance.file_types') }}" class="btn btn-primary">
+                            Gestionar Tipos de Archivo
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Tablas Personalizadas</h5>
+                        <p class="card-text">Crear y gestionar tablas con campos personalizados.</p>
+                        <a href="{{ url_for('tables.index') }}" class="btn btn-primary">
+                            Gestionar Tablas
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
