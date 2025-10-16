@@ -1,5 +1,7 @@
 from app import db
 from datetime import datetime
+import sqlite3
+from sqlalchemy import inspect, text
 
 class FileType(db.Model):
     """Modelo para tipos de archivo y sus extensiones"""
@@ -20,6 +22,41 @@ class FileType(db.Model):
                         file_type = FileType(extension=ext, type=media_type)
                         db.session.add(file_type)
             db.session.commit()
+
+def init_existing_tables(app):
+    """Sincroniza los modelos con las tablas existentes en la base de datos"""
+    with app.app_context():
+        # Obtener el inspector de SQLAlchemy
+        inspector = inspect(db.engine)
+        
+        # Obtener todas las tablas existentes
+        existing_tables = inspector.get_table_names()
+        
+        # Buscar tablas dinámicas (excluyendo las tablas del sistema)
+        for table_name in existing_tables:
+            if table_name not in ['file_types', 'dynamic_table', 'table_field']:
+                # Verificar si ya existe en dynamic_table
+                if not DynamicTable.query.filter_by(name=table_name).first():
+                    # Crear entrada en dynamic_table
+                    table = DynamicTable(name=table_name, description=f"Tabla existente: {table_name}")
+                    db.session.add(table)
+                    db.session.commit()
+                    
+                    # Obtener información de las columnas
+                    columns = inspector.get_columns(table_name)
+                    for column in columns:
+                        # Crear entrada en table_field
+                        field = TableField(
+                            table_id=table.id,
+                            name=column['name'],
+                            field_type=str(column['type']).upper(),
+                            is_required=not column['nullable'],
+                            is_primary_key=column.get('primary_key', False),
+                            is_auto_increment=column.get('autoincrement', False),
+                            default_value=str(column.get('default', '')) if column.get('default') is not None else None
+                        )
+                        db.session.add(field)
+                    db.session.commit()
 
 class DynamicTable(db.Model):
     """Modelo para almacenar información sobre tablas dinámicas"""

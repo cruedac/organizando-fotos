@@ -30,6 +30,7 @@
                                     <th>Nombre</th>
                                     <th>Descripción</th>
                                     <th>Campos</th>
+                                    <th>Registros</th>
                                     <th>Creada</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -40,6 +41,7 @@
                                     <td>{{ table.name }}</td>
                                     <td>{{ table.description or '' }}</td>
                                     <td>{{ table.fields|length }}</td>
+                                    <td>{{ table.record_count }}</td>
                                     <td>{{ table.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                     <td>
                                         <div class="btn-group" role="group">

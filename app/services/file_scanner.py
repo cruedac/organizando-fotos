@@ -7,7 +7,8 @@ def scan_for_media_recursive(
     folder_path: str,
     image_extensions: Set[str] = None,
     video_extensions: Set[str] = None,
-    audio_extensions: Set[str] = None
+    audio_extensions: Set[str] = None,
+    scan_subdirs: bool = True
 ) -> Dict[str, Any]:
     """Recursively scans folder_path and counts files by type and extension.
     
@@ -28,7 +29,14 @@ def scan_for_media_recursive(
     totals = {'image': 0, 'video': 0, 'audio': 0, 'other': 0}
     by_extension = {}
 
-    for root, _, files in os.walk(folder_path):
+    # Si scan_subdirs es False, solo escaneamos el directorio actual
+    if scan_subdirs:
+        walker = os.walk(folder_path)
+    else:
+        # Solo procesamos el directorio actual, sin subdirectorios
+        walker = [(folder_path, [], [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))])]
+    
+    for root, dirs, files in walker:
         for fname in files:
             _, ext = os.path.splitext(fname)
             ext_norm = ext.strip().lower()

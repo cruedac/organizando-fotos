@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{% if movie %}Editar Película{% else %}Agregar Película{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h2>{% if movie %}Editar Película #{{ movie.num }}{% else %}Agregar Película{% endif %}</h2>
+
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label">NUM</label>
+                {% if movie %}
+                    <input class="form-control" name="num" value="{{ movie.num }}" readonly />
+                {% else %}
+                    <input class="form-control" name="num" required />
+                {% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Título original</label>
+                <input class="form-control" name="originaltitle" value="{{ movie.originaltitle if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Título traducido</label>
+                <input class="form-control" name="translatedtitle" value="{{ movie.translatedtitle if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Formato</label>
+                <input class="form-control" name="formattedtitle" value="{{ movie.formattedtitle if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Año</label>
+                <input class="form-control" name="year" type="number" value="{{ movie.year if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Categoría</label>
+                <input class="form-control" name="category" value="{{ movie.category if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Tipo de medio</label>
+                <input class="form-control" name="mediatype" value="{{ movie.mediatype if movie else '' }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <textarea class="form-control" name="description" rows="4">{{ movie.description if movie else '' }}</textarea>
+            </div>
+
+            <button class="btn btn-primary" type="submit">Guardar</button>
+            <a class="btn btn-secondary" href="{{ url_for('videos.manage') }}">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

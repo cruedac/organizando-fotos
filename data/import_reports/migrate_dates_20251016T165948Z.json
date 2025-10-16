@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-10-16T16:59:48.566876Z",
+  "db_file": "data/multimedia.db",
+  "backup_file": "F:\\OneDrive\\Phyton\\organizando-fotos\\data\\backup\\multimedia_20251016-165948.db",
+  "rows_total": 125,
+  "rows_migrated": 125,
+  "rows_skipped": 0,
+  "errors": []
+}

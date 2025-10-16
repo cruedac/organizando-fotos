@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Videos - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Gestión de Videos</h2>
+
+        <!-- Botón de importación -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="btn-group" role="group">
+                    <form action="{{ url_for('videos.import_data') }}" method="post" style="display:inline">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i> Importar Datos (CSV/SQL)
+                        </button>
+                    </form>
+
+                    <form action="{{ url_for('videos.import_legacy') }}" method="post" style="display:inline; margin-left:8px;">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-database"></i> Importar Cintas.sql (legacy)
+                        </button>
+                    </form>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('videos.manage') }}" style="margin-left:8px;">
+                        <i class="fas fa-tools"></i> Mantenimiento
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros de búsqueda -->
+        <div class="row mb-4">
+            <div class="col">
+                <form method="get" class="form-inline">
+                    <div class="input-group mb-2 mr-sm-2">
+                        <input type="text" class="form-control" name="q" placeholder="Buscar videos..." 
+                               value="{{ search_query }}">
+                    </div>
+
+                    <select class="custom-select mb-2 mr-sm-2" name="category">
+                        <option value="">Categoría...</option>
+                        {% for category in categories %}
+                        <option value="{{ category[0] }}" {% if current_filters.category == category[0] %}selected{% endif %}>
+                            {{ category[0] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <select class="custom-select mb-2 mr-sm-2" name="media_type">
+                        <option value="">Tipo de medio...</option>
+                        {% for type in media_types %}
+                        <option value="{{ type[0] }}" {% if current_filters.media_type == type[0] %}selected{% endif %}>
+                            {{ type[0] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <select class="custom-select mb-2 mr-sm-2" name="year">
+                        <option value="">Año...</option>
+                        {% for year in years %}
+                        <option value="{{ year[0] }}" {% if current_filters.year == year[0] %}selected{% endif %}>
+                            {{ year[0] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    <button type="submit" class="btn btn-primary mb-2">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="row">
+            {% if videos %}
+                {% for video in videos %}
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ video.title }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                {% if video.year %}{{ video.year }}{% endif %}
+                                {% if video.mediatype %} - {{ video.mediatype }}{% endif %}
+                            </h6>
+                            <p class="card-text">
+                                {% if video.description %}
+                                    {{ video.description[:150] }}...
+                                {% endif %}
+                            </p>
+                            <div class="card-text">
+                                {% if video.category %}
+                                <span class="badge badge-info">{{ video.category }}</span>
+                                {% endif %}
+                            </div>
+                            <a href="{{ url_for('videos.detail', video_id=video.num) }}" 
+                               class="btn btn-outline-primary mt-2">
+                                Ver detalles
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col">
+                    <div class="alert alert-info">
+                        No se encontraron videos. {% if not videos %}Puedes importar datos usando el botón superior.{% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Mensajes Flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+{% endblock %}

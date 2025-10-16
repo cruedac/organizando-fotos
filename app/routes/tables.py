@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from app.models.database import db, DynamicTable, TableField
+from sqlalchemy import inspect, text
 from sqlalchemy import text
 
 bp = Blueprint('tables', __name__, url_prefix='/tables')
@@ -7,7 +8,21 @@ bp = Blueprint('tables', __name__, url_prefix='/tables')
 @bp.route('/')
 def index():
     """Lista todas las tablas dinámicas"""
+    # Obtener todas las tablas registradas
     tables = DynamicTable.query.all()
+    
+    # Obtener información real de las tablas desde la base de datos
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+    
+    # Añadir información sobre el número real de registros
+    for table in tables:
+        if table.name in existing_tables:
+            result = db.session.execute(text(f'SELECT COUNT(*) FROM {table.name}')).scalar()
+            table.record_count = result
+        else:
+            table.record_count = 0
+    
     return render_template('tables/index.html', tables=tables)
 
 @bp.route('/create', methods=['GET', 'POST'])

@@ -1,38 +1,60 @@
 # organizando-fotos
 
-Aplicación de escritorio en Python para organizar archivos multimedia. Permite gestionar una base de datos SQLite con interfaz gráfica para el manejo de archivos multimedia.
+Aplicación web en Flask para organizar archivos multimedia. Proporciona una interfaz moderna y responsive para gestionar archivos multimedia con una base de datos SQLite a través de SQLAlchemy.
 
 ## Características
 
-### Gestión de Base de Datos
-- Abrir y conectar con bases de datos SQLite existentes
-- Visualización de datos en formato tabla
-- Operaciones CRUD completas:
-  - Crear nuevos registros
-  - Ver registros existentes
-  - Modificar registros
-  - Eliminar registros
+### Gestión de Archivos
+- Escaneo recursivo de directorios
+- Detección automática de tipos de archivo
+- Análisis estadístico de contenido multimedia
+- Interfaz web moderna y responsive
 
-### Mantenimiento de Tablas
-- Visualización de tablas existentes
-- Ver estructura detallada de cada tabla
-- Creación de nuevas tablas con:
-  - Definición de campos personalizados
-  - Múltiples tipos de datos (TEXT, INTEGER, REAL, BLOB, DATE, DATETIME)
-  - Opciones por campo:
+### Sistema de Tablas Dinámicas
+- Creación y gestión de tablas personalizadas
+- Definición flexible de campos:
+  - Múltiples tipos de datos (TEXT, INTEGER, REAL, DATE, DATETIME, BOOLEAN)
+  - Configuración avanzada por campo:
     - Clave primaria
     - Auto incremento
-    - Restricción NOT NULL
+    - Valores por defecto
+    - Restricciones de obligatoriedad
 
-### Análisis de Directorios
-- Escaneo recursivo de carpetas
-- Conteo de archivos por tipo (imagen/video/audio/otros)
-- Desglose detallado por extensión
-- Soporte para archivos ocultos y sin extensión
+### Gestión de Tipos de Archivo
+- Interfaz de administración de tipos de archivo
+- Configuración flexible de extensiones soportadas
+- Categorización automática por tipo:
+  - Imágenes
+  - Videos
+  - Audio
+
+### Gestión de Videos
+- Catálogo completo de videos con metadatos:
+  - Información básica (título, año, duración)
+  - Detalles técnicos (formato, resolución)
+  - Organización (categorías, etiquetas)
+- Importación de datos desde sistemas legacy
+- Búsqueda y filtrado avanzado:
+  - Por título y descripción
+  - Por categoría y tipo de medio
+  - Por año
+- Soporte para múltiples formatos:
+  - Digital: mp4, avi, mov, etc.
+  - Análogo: 8mm, Hi-8, Digital-8
+- Gestión de contenido adicional por video
+
+### Análisis de Archivos
+- Escaneo configurable de directorios (con/sin subdirectorios)
+- Estadísticas detalladas:
+  - Conteo por tipo de archivo
+  - Distribución por extensión
+  - Detección de archivos sin extensión
+- Interfaz visual para resultados
+- API REST para integración
 
 ### Tipos de Archivos Soportados
 - Imágenes: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp`, `.heic`, `.svg`, `.raw`, `.CR2`, `.CR3`
-- Videos: `.mp4`, `.avi`, `.mov`, `.wmv`, `.flv`, `.mkv`
+- Videos: `.mp4`, `.avi`, `.mov`, `.wmv`, `.flv`, `.mkv`, `8mm`, `hi-8`, `digital-8`
 - Audio: `.mp3`, `.wav`, `.ogg`, `.aac`, `.flac`
 
 ## Instalación
@@ -43,61 +65,92 @@ git clone https://github.com/cruedac/organizando-fotos.git
 cd organizando-fotos
 ```
 
-2. Instalar dependencias:
+2. Crear y activar entorno virtual:
+```bash
+python -m venv .venv
+# Windows
+.\.venv\Scripts\Activate.ps1
+# Linux/Mac
+source .venv/bin/activate
+```
+
+3. Instalar dependencias:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Inicializar la base de datos:
+4. Configurar el entorno:
 ```bash
-python database/create_db.py
+# Copiar el archivo de ejemplo
+cp .env.example .env
+# Editar .env con tus configuraciones
 ```
 
 ## Uso
 
-Para iniciar la aplicación:
+1. Iniciar la aplicación:
 ```bash
-python main_app.py
+python run.py
 ```
 
-### Flujo básico de uso:
-1. Ir a "Archivo" -> "Abrir Base de Datos" para conectar con una base de datos
-2. Usar el menú "Tablas" para seleccionar la tabla a visualizar
-3. Utilizar los botones CRUD para gestionar los registros:
-   - "Insertar" para añadir nuevos registros
-   - "Modificar" para editar registros existentes
-   - "Borrar" para eliminar registros
-   - "Actualizar" para refrescar la vista
+2. Acceder a través del navegador:
+```
+http://localhost:5000
+```
 
-### Análisis de Directorios:
-1. Ir a "Herramientas" -> "Importar Archivos"
-2. Seleccionar la carpeta a analizar
-3. Ver el resumen detallado que incluye:
-   - Conteo total por tipo de archivo
-   - Desglose por extensión ordenado por frecuencia
-   - Detección de archivos sin extensión
+### Funcionalidades Principales:
 
-### Mantenimiento de Tablas:
-1. Ir a "Herramientas" -> "Mantenimiento de Tablas"
-2. Para ver la estructura de una tabla existente:
-   - Seleccionar la tabla del desplegable
-   - Hacer clic en "Ver Estructura"
-3. Para crear una nueva tabla:
-   - Introducir el nombre de la tabla
-   - Añadir campos usando "Añadir Campo"
-   - Configurar las propiedades de cada campo
-   - Hacer clic en "Crear Tabla"
+#### Análisis de Directorios
+1. Acceder a la página principal
+2. Seleccionar una carpeta para analizar
+3. Configurar opciones de escaneo (incluir/excluir subdirectorios)
+4. Ver resultados detallados:
+   - Resumen por tipo de archivo
+   - Estadísticas por extensión
+   - Visualización gráfica
 
-## Dependencias Principales
-- PySide6: Interfaz gráfica (Qt para Python)
-- Pillow: Procesamiento de imágenes
-- Mutagen: Metadata de archivos multimedia
+#### Gestión de Tipos de Archivo
+1. Ir a "Mantenimiento" -> "Tipos de Archivo"
+2. Gestionar extensiones soportadas:
+   - Añadir nuevas extensiones
+   - Modificar tipos existentes
+   - Eliminar extensiones no deseadas
+
+#### Tablas Dinámicas
+1. Ir a "Mantenimiento" -> "Tablas"
+2. Operaciones disponibles:
+   - Crear nuevas tablas
+   - Añadir y configurar campos
+   - Gestionar estructura existente
+   - Eliminar tablas y campos
+
+#### Gestión de Videos
+1. Ir a "Videos"
+2. Operaciones disponibles:
+   - Importar datos desde archivos SQL
+   - Buscar videos por título, descripción y metadatos
+   - Filtrar por categoría, año y tipo de medio
+   - Ver detalles técnicos y contenido adicional
+   - Gestionar información de videos analógicos y digitales
+
+## Tecnologías Utilizadas
+- Flask: Framework web
+- SQLAlchemy: ORM para base de datos
+- Bootstrap: Framework CSS
+- Python-dotenv: Gestión de configuración
+- Jinja2: Motor de plantillas
+- SQLite: Base de datos relacional
 
 ## Estado del Proyecto
-- [x] Interfaz gráfica básica
-- [x] Operaciones CRUD
-- [x] Gestión de tablas
-- [x] Análisis recursivo de directorios
-- [ ] Importación de archivos a base de datos
-- [ ] Gestión de metadatos
+- [x] Interfaz web responsive
+- [x] Sistema de blueprints Flask
+- [x] Gestión de tablas dinámicas
+- [x] Análisis de directorios
+- [x] API REST para escaneo
+- [x] Importación de archivos
+- [x] Gestión de metadatos de video
+- [x] Catálogo de videos
 - [ ] Organización automática
+- [ ] Sistema de usuarios
+- [ ] Procesamiento de imágenes
+- [ ] API completa
