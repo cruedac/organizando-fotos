@@ -24,6 +24,12 @@ Aplicación de escritorio en Python para organizar archivos multimedia. Permite 
     - Auto incremento
     - Restricción NOT NULL
 
+### Análisis de Directorios
+- Escaneo recursivo de carpetas
+- Conteo de archivos por tipo (imagen/video/audio/otros)
+- Desglose detallado por extensión
+- Soporte para archivos ocultos y sin extensión
+
 ### Tipos de Archivos Soportados
 - Imágenes: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp`, `.heic`, `.svg`, `.raw`, `.CR2`, `.CR3`
 - Videos: `.mp4`, `.avi`, `.mov`, `.wmv`, `.flv`, `.mkv`
@@ -63,6 +69,14 @@ python main_app.py
    - "Borrar" para eliminar registros
    - "Actualizar" para refrescar la vista
 
+### Análisis de Directorios:
+1. Ir a "Herramientas" -> "Importar Archivos"
+2. Seleccionar la carpeta a analizar
+3. Ver el resumen detallado que incluye:
+   - Conteo total por tipo de archivo
+   - Desglose por extensión ordenado por frecuencia
+   - Detección de archivos sin extensión
+
 ### Mantenimiento de Tablas:
 1. Ir a "Herramientas" -> "Mantenimiento de Tablas"
 2. Para ver la estructura de una tabla existente:
@@ -83,6 +97,7 @@ python main_app.py
 - [x] Interfaz gráfica básica
 - [x] Operaciones CRUD
 - [x] Gestión de tablas
-- [ ] Importación de archivos
+- [x] Análisis recursivo de directorios
+- [ ] Importación de archivos a base de datos
 - [ ] Gestión de metadatos
 - [ ] Organización automática

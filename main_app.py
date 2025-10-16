@@ -11,6 +11,7 @@ from database.utils import (
     get_connection, get_tables, fetch_all, fetch_columns,
     insert_record, update_record, delete_record
 )
+from utils.file_scanner import scan_for_media_recursive
 
 class TableFieldDialog(QDialog):
     """Diálogo para crear o editar un campo de una tabla."""
@@ -489,7 +490,32 @@ class DatabaseApp(QMainWindow):
 
     def import_files(self):
         """Importa archivos multimedia a la base de datos."""
-        QMessageBox.information(self, "Próximamente", "Función de importación en desarrollo")
+        # Pedir carpeta al usuario
+        folder = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta para escanear")
+        if not folder:
+            return
+
+        try:
+            # Usar las extensiones definidas en create_db si están disponibles
+            try:
+                from database.create_db import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
+                image_exts = IMAGE_EXTENSIONS
+                video_exts = VIDEO_EXTENSIONS
+                audio_exts = AUDIO_EXTENSIONS
+            except Exception:
+                image_exts = video_exts = audio_exts = None
+
+            result = scan_for_media_recursive(folder, image_exts, video_exts, audio_exts)
+            totals = result['totals']
+            by_ext = result['by_extension']
+
+            msg_lines = [f"Ruta: {folder}", f"Imágenes: {totals.get('image',0)}", f"Videos: {totals.get('video',0)}", f"Audios: {totals.get('audio',0)}", f"Otros: {totals.get('other',0)}", "", "Desglose por extensión:"]
+            for ext, cnt in sorted(by_ext.items(), key=lambda x: x[1], reverse=True):
+                msg_lines.append(f"{ext}: {cnt}")
+
+            QMessageBox.information(self, "Resultado del escaneo", "\n".join(msg_lines))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al escanear la carpeta: {str(e)}")
 
     def show_table_maintenance(self):
         """Muestra el diálogo de mantenimiento de tablas."""
