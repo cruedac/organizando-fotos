@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Registros de {{ table.name }} - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-0">Registros: {{ table.name }}</h2>
+                {% if table.description %}
+                <small class="text-muted">{{ table.description }}</small>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('tables.add_record', table_id=table.id) }}" class="btn btn-success">
+                    Añadir Registro
+                </a>
+                <a href="{{ url_for('tables.index') }}" class="btn btn-outline-secondary">
+                    Volver a Tablas
+                </a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="card-body">
+                {% if rows %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                {% for field in fields %}
+                                <th>{{ field.name }}</th>
+                                {% endfor %}
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                            <tr>
+                                {% for field in fields %}
+                                <td>{{ row[field.name] }}</td>
+                                {% endfor %}
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('tables.edit_record', table_id=table.id, record_id=row['id']) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                        <form action="{{ url_for('tables.delete_record', table_id=table.id, record_id=row['id']) }}"
+                                              method="POST"
+                                              onsubmit="return confirm('¿Seguro que quieres eliminar este registro?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    Aún no hay registros en esta tabla. Utiliza el botón "Añadir Registro" para comenzar.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

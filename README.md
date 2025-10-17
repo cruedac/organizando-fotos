@@ -41,7 +41,14 @@ Aplicación web en Flask para organizar archivos multimedia. Proporciona una int
 - Soporte para múltiples formatos:
   - Digital: mp4, avi, mov, etc.
   - Análogo: 8mm, Hi-8, Digital-8
-- Gestión de contenido adicional por video
+- Validación del tipo de soporte frente a un catálogo editable
+- Almacenamiento y copia directa de la ruta de archivo
+
+### Mantenimiento del Sistema
+- Panel con estadísticas en vivo de la base de datos
+- Copias de seguridad bajo demanda del fichero SQLite
+- Diferenciación entre tablas operativas y de sistema
+- Gestión de tablas dinámicas con salvaguardas al eliminar
 
 ### Análisis de Archivos
 - Escaneo configurable de directorios (con/sin subdirectorios)

@@ -7,9 +7,14 @@
     <div class="col-md-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Editar Tabla: {{ table.name }}</h2>
-            <a href="{{ url_for('tables.add_field', table_id=table.id) }}" class="btn btn-primary">
-                Añadir Campo
-            </a>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('tables.manage_records', table_id=table.id) }}" class="btn btn-success">
+                    Gestionar Registros
+                </a>
+                <a href="{{ url_for('tables.add_field', table_id=table.id) }}" class="btn btn-primary">
+                    Añadir Campo
+                </a>
+            </div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}

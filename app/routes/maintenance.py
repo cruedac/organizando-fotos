@@ -82,6 +82,15 @@ def _resolve_table_actions(table_name: str) -> dict:
             'can_drop': True
         }
 
+    dynamic = DynamicTable.query.filter_by(name=table_name).first()
+    if dynamic:
+        return {
+            'has_action': True,
+            'label': 'Operar',
+            'url': url_for('tables.manage_records', table_id=dynamic.id),
+            'can_drop': True
+        }
+
     return {'has_action': False, 'label': None, 'url': None, 'can_drop': True}
 
 

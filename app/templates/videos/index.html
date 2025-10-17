@@ -94,10 +94,16 @@
                                 <span class="badge badge-info">{{ video.category }}</span>
                                 {% endif %}
                             </div>
-                            <a href="{{ url_for('videos.detail', video_id=video.num) }}" 
-                               class="btn btn-outline-primary mt-2">
-                                Ver detalles
-                            </a>
+                            <div class="d-flex flex-wrap mt-2">
+                                <a href="{{ url_for('videos.detail', video_id=video.num) }}" 
+                                   class="btn btn-outline-primary mr-2 mb-2">
+                                    Ver detalles
+                                </a>
+                                <a href="{{ url_for('videos.edit_movie', movie_id=video.num) }}"
+                                   class="btn btn-outline-warning mb-2">
+                                    Editar
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

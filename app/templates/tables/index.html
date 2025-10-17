@@ -45,6 +45,10 @@
                                     <td>{{ table.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
+                                            <a href="{{ url_for('tables.manage_records', table_id=table.id) }}"
+                                               class="btn btn-sm btn-outline-success">
+                                                Registros
+                                            </a>
                                             <a href="{{ url_for('tables.edit_table', table_id=table.id) }}"
                                                class="btn btn-sm btn-outline-primary">
                                                 Editar

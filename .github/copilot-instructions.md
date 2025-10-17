@@ -11,8 +11,9 @@ This document provides essential context for AI agents working with the organiza
    - Uses Flask-SQLAlchemy for ORM
    - Modular structure with Blueprints:
      - `main`: Core functionality
-     - `maintenance`: System maintenance
+     - `maintenance`: System maintenance & database tools
      - `tables`: Dynamic table management
+     - `videos`: Legacy catalogue management
      - `api`: RESTful endpoints
 
 2. **Database Layer** (`app/models/`)
@@ -21,6 +22,8 @@ This document provides essential context for AI agents working with the organiza
      - `FileType`: Media file type management
      - `DynamicTable`: Custom table definitions
      - `TableField`: Dynamic table field configurations
+     - `TipoSoporte`: Catalogue of valid media supports
+     - `Movie`: Legacy movie metadata (includes mediatype validation)
 
 ### Data Flow
 - HTTP Requests → Flask Routes → SQLAlchemy Models → SQLite database
@@ -56,11 +59,12 @@ python run.py
 - Key operations:
   - Dynamic table creation and management
   - File type registration and validation
-  - Database schema synchronization
+  - Tipo de soporte CRUD flow backing mediatype validation
+  - Database schema synchronization & protected table removal
 
 ### Supported Media Types
 - Images: `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp`, `.heic`, `.svg`, `.raw`, `.CR2`, `.CR3`
-- Videos: `.mp4`, `.avi`, `.mov`, `.wmv`, `.flv`, `.mkv`
+- Videos: `.mp4`, `.avi`, `.mov`, `.wmv`, `.flv`, `.mkv`, `8mm`, `hi-8`, `digital-8`
 - Audio: `.mp3`, `.wav`, `.ogg`, `.aac`, `.flac`
 
 ### Project Structure
@@ -79,6 +83,12 @@ python run.py
 ├── run.py            # Application entry point
 └── requirements.txt   # Dependencies
 ```
+
+### Maintenance Utilities
+- Dashboard surfaces live SQLite table counts, size, and suggested backup naming
+- Backup workflow copies `data/multimedia.db` to a `.bk` file with flash feedback
+- Tables flagged as system tables (e.g., SQLite internals) are rendered read-only
+- Dynamic tables can be dropped from maintenance once dependency checks pass
 
 ## Development Guidelines
 1. Follow Flask blueprint organization for modular code
