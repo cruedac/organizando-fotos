@@ -102,3 +102,15 @@ class TableField(db.Model):
                 (cls.DATETIME, 'Fecha y Hora'),
                 (cls.BOOLEAN, 'Sí/No')
             ]
+
+
+class TipoSoporte(db.Model):
+    """Catálogo de tipos de soporte físico o digital para los videos."""
+    __tablename__ = 'tipo_soporte'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<TipoSoporte {self.tipo}>'

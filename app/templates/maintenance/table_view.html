@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{{ table_name }} - Vista de tabla{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+    <h2>{{ table_name }}</h2>
+    {% if not can_drop %}
+    <div class="alert alert-info">Esta tabla no se puede eliminar.</div>
+    {% endif %}
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm align-middle">
+                        <thead>
+                            <tr>
+                                {% for column in columns %}
+                                <th>{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if rows %}
+                                {% for row in rows %}
+                                <tr>
+                                    {% for value in row %}
+                                    <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="{{ columns|length }}" class="text-center text-muted">No hay registros.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('maintenance.index') }}" class="btn btn-secondary">Volver</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

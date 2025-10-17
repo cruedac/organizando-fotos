@@ -73,8 +73,6 @@ class Movie(db.Model):
         except Exception:
             return str(self.datewatched)
 
-    extras = db.relationship('Extra', backref='movie', lazy=True)
-
     def __repr__(self):
         return f'<Movie {self.num}: {self.originaltitle or self.translatedtitle or self.formattedtitle}>'
     
@@ -82,23 +80,3 @@ class Movie(db.Model):
     def title(self):
         """Retorna el primer título no vacío siguiendo la prioridad: original, traducido, formateado"""
         return self.originaltitle or self.translatedtitle or self.formattedtitle or f"Video #{self.num}"
-
-
-class Extra(db.Model):
-    """Modelo para almacenar contenido adicional relacionado con videos"""
-    __tablename__ = 'extras'
-
-    num = db.Column('NUM', db.Integer, primary_key=True)
-    movienum = db.Column('MOVIENUM', db.Integer, db.ForeignKey('movies.NUM'), primary_key=True)
-    checked = db.Column('CHECKED', db.String(5))
-    tag = db.Column('TAG', db.String(100))
-    title = db.Column('TITLE', db.String(200))
-    category = db.Column('CATEGORY', db.String(100))
-    url = db.Column('URL', db.String(500))
-    description = db.Column('DESCRIPTION', db.Text)
-    comments = db.Column('COMMENTS', db.Text)
-    createdby = db.Column('CREATEDBY', db.String(100))
-    picturestatus = db.Column('PICTURESTATUS', db.String(50))
-
-    def __repr__(self):
-        return f'<Extra {self.num} for Movie {self.movienum}: {self.title}>'

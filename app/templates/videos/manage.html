@@ -20,6 +20,7 @@
                     <th>Año</th>
                     <th>Categoría</th>
                     <th>Tipo</th>
+                    <th>Ruta</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -31,6 +32,9 @@
                     <td>{{ m.year or '' }}</td>
                     <td>{{ m.category or '' }}</td>
                     <td>{{ m.mediatype or '' }}</td>
+                    <td class="text-break small" style="max-width: 240px;">
+                        {{ m.filepath or '' }}
+                    </td>
                     <td>
                         <a class="btn btn-sm btn-primary" href="{{ url_for('videos.detail', video_id=m.num) }}">Ver</a>
                         <a class="btn btn-sm btn-warning" href="{{ url_for('videos.edit_movie', movie_id=m.num) }}">Editar</a>

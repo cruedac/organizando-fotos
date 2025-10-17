@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}{% if support_type %}Editar{% else %}Añadir{% endif %} Tipo de Soporte{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    {% if support_type %}Editar{% else %}Añadir{% endif %} Tipo de Soporte
+                </h3>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label">Nombre del tipo de soporte</label>
+                        <input type="text"
+                               class="form-control"
+                               id="tipo"
+                               name="tipo"
+                               maxlength="100"
+                   value="{{ form_data.tipo if form_data else (support_type.tipo if support_type else '') }}"
+                               required>
+                        <div class="form-text">Ejemplos: DVD, Blu-ray, Archivo digital, etc.</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <a href="{{ url_for('maintenance.support_types') }}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

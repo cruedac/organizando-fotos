@@ -41,6 +41,16 @@
                             <dd class="col-sm-8">{{ video.mediatype }}</dd>
                             {% endif %}
 
+                            {% if video.filepath %}
+                            <dt class="col-sm-4">Ruta</dt>
+                            <dd class="col-sm-8">
+                                <div class="d-flex align-items-start gap-2">
+                                    <code class="text-break">{{ video.filepath }}</code>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" id="copyFilepathBtn" data-path="{{ video.filepath }}">Copiar</button>
+                                </div>
+                            </dd>
+                            {% endif %}
+
                             {% if video.media %}
                             <dt class="col-sm-4">Medio</dt>
                             <dd class="col-sm-8">{{ video.media }}</dd>
@@ -109,36 +119,31 @@
                 </div>
                 {% endif %}
 
-                <!-- Contenido Extra -->
-                {% if video.extras %}
-                <div class="row">
-                    <div class="col-12">
-                        <h5>Contenido Adicional</h5>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Título</th>
-                                        <th>Categoría</th>
-                                        <th>Descripción</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for extra in video.extras %}
-                                    <tr>
-                                        <td>{{ extra.title }}</td>
-                                        <td>{{ extra.category }}</td>
-                                        <td>{{ extra.description }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
+    {% block scripts %}
+    {{ super() }}
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const copyBtn = document.getElementById('copyFilepathBtn');
+        if (!copyBtn) {
+            return;
+        }
+        copyBtn.addEventListener('click', async function () {
+            try {
+                await navigator.clipboard.writeText(copyBtn.dataset.path || '');
+                copyBtn.textContent = 'Copiado';
+                setTimeout(() => copyBtn.textContent = 'Copiar', 2000);
+            } catch (error) {
+                copyBtn.classList.remove('btn-outline-secondary');
+                copyBtn.classList.add('btn-outline-danger');
+                copyBtn.textContent = 'Error';
+            }
+        });
+    });
+    </script>
+    {% endblock %}

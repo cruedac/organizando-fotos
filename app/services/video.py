@@ -5,7 +5,7 @@ Servicios para la gestión de videos
 import os
 import sqlite3
 from app import db
-from app.models.movie import Movie, Extra
+from app.models.movie import Movie
 from datetime import datetime
 import re
 
@@ -56,16 +56,6 @@ class VideoService:
                 # Creamos el registro
                 movie_obj = Movie(**movie_dict)
                 db.session.add(movie_obj)
-
-            # Importamos los extras
-            cursor.execute('SELECT * FROM extras')
-            columns = [desc[0] for desc in cursor.description]
-            extras_data = cursor.fetchall()
-
-            for extra in extras_data:
-                extra_dict = dict(zip(columns, extra))
-                extra_obj = Extra(**extra_dict)
-                db.session.add(extra_obj)
 
             # Guardamos todos los cambios
             db.session.commit()

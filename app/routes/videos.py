@@ -2,7 +2,8 @@
 Rutas para la gestión de videos
 """
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, Markup
-from app.models.movie import Movie, Extra
+from app.models.movie import Movie
+from app.models.database import TipoSoporte
 from app.services.video import VideoService
 from app.services.video_import import import_sql_file
 from app import db
@@ -125,53 +126,100 @@ def manage():
 @bp.route('/add', methods=['GET', 'POST'])
 def add_movie():
     """Agregar nuevo registro a movies"""
+    support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
     if request.method == 'POST':
-        # Leer campos mínimos: num, originaltitle, translatedtitle, year, category, mediatype, description
+        form_data = request.form.to_dict()
+        form_data['num'] = (form_data.get('num') or '').strip()
+
+        # Validación de NUM
         try:
-            num = int(request.form.get('num'))
+            num = int(form_data['num'])
         except Exception:
             flash('NUM debe ser un número entero válido.', 'error')
-            return redirect(url_for('videos.add_movie'))
+            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
 
         if Movie.query.get(num):
             flash(f'Ya existe una película con NUM={num}.', 'error')
-            return redirect(url_for('videos.add_movie'))
+            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
+
+        support_names = {s.tipo for s in support_types}
+        mediatype_value = (form_data.get('mediatype') or '').strip()
+        form_data['mediatype'] = mediatype_value
+        mediatype = mediatype_value or None
+        if mediatype and mediatype not in support_names:
+            flash('El tipo de soporte seleccionado no es válido.', 'error')
+            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
+
+        # Validar año si viene informado
+        year_value = (form_data.get('year') or '').strip()
+        form_data['year'] = year_value
+        if year_value:
+            try:
+                year = int(year_value)
+            except ValueError:
+                flash('El año debe ser un número entero.', 'error')
+                return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
+        else:
+            year = None
 
         movie = Movie(
             num=num,
-            originaltitle=request.form.get('originaltitle') or None,
-            translatedtitle=request.form.get('translatedtitle') or None,
-            formattedtitle=request.form.get('formattedtitle') or None,
-            year=request.form.get('year', type=int),
-            category=request.form.get('category') or None,
-            mediatype=request.form.get('mediatype') or None,
-            description=request.form.get('description') or None,
+            originaltitle=form_data.get('originaltitle') or None,
+            translatedtitle=form_data.get('translatedtitle') or None,
+            formattedtitle=form_data.get('formattedtitle') or None,
+            year=year,
+            category=form_data.get('category') or None,
+            mediatype=mediatype,
+            description=form_data.get('description') or None,
+            filepath=form_data.get('filepath') or None,
         )
         db.session.add(movie)
         db.session.commit()
         flash('Película añadida correctamente.', 'success')
         return redirect(url_for('videos.manage'))
 
-    return render_template('videos/movie_form.html', movie=None)
+    return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=None)
 
 
 @bp.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
 def edit_movie(movie_id):
     """Editar un registro existente"""
     movie = Movie.query.get_or_404(movie_id)
+    support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
+
     if request.method == 'POST':
-        movie.originaltitle = request.form.get('originaltitle') or None
-        movie.translatedtitle = request.form.get('translatedtitle') or None
-        movie.formattedtitle = request.form.get('formattedtitle') or None
-        movie.year = request.form.get('year', type=int)
-        movie.category = request.form.get('category') or None
-        movie.mediatype = request.form.get('mediatype') or None
-        movie.description = request.form.get('description') or None
+        form_data = request.form.to_dict()
+        support_names = {s.tipo for s in support_types}
+        mediatype_value = (form_data.get('mediatype') or '').strip()
+        form_data['mediatype'] = mediatype_value
+        mediatype = mediatype_value or None
+        if mediatype and mediatype not in support_names:
+            flash('El tipo de soporte seleccionado no es válido.', 'error')
+            return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_data)
+
+        year_value = (form_data.get('year') or '').strip()
+        form_data['year'] = year_value
+        if year_value:
+            try:
+                movie.year = int(year_value)
+            except ValueError:
+                flash('El año debe ser un número entero.', 'error')
+                return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_data)
+        else:
+            movie.year = None
+
+        movie.originaltitle = form_data.get('originaltitle') or None
+        movie.translatedtitle = form_data.get('translatedtitle') or None
+        movie.formattedtitle = form_data.get('formattedtitle') or None
+        movie.category = form_data.get('category') or None
+        movie.mediatype = mediatype
+        movie.description = form_data.get('description') or None
+        movie.filepath = form_data.get('filepath') or None
         db.session.commit()
         flash('Película actualizada correctamente.', 'success')
         return redirect(url_for('videos.manage'))
 
-    return render_template('videos/movie_form.html', movie=movie)
+    return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=None)
 
 
 @bp.route('/delete/<int:movie_id>', methods=['POST'])

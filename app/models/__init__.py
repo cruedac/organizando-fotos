@@ -2,13 +2,13 @@
 Paquete de modelos de la aplicación
 """
 
-from .database import FileType, DynamicTable, TableField
-from .movie import Movie, Extra
+from .database import FileType, DynamicTable, TableField, TipoSoporte
+from .movie import Movie
 
 __all__ = [
     'FileType',
     'DynamicTable',
     'TableField',
-    'Movie',
-    'Extra'
+    'TipoSoporte',
+    'Movie'
 ]

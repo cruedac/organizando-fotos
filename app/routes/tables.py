@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from app.models.database import db, DynamicTable, TableField
 from sqlalchemy import inspect, text
-from sqlalchemy import text
+from sqlalchemy.engine import reflection
 
 bp = Blueprint('tables', __name__, url_prefix='/tables')
 
@@ -39,6 +39,18 @@ def create_table():
         
         table = DynamicTable(name=name, description=description)
         db.session.add(table)
+        db.session.commit()
+
+        # Añadir campo ID por defecto para nuevas tablas dinámicas
+        id_field = TableField(
+            table_id=table.id,
+            name='id',
+            field_type=TableField.FieldTypes.INTEGER,
+            is_required=True,
+            is_primary_key=True,
+            is_auto_increment=True
+        )
+        db.session.add(id_field)
         db.session.commit()
         
         flash('Tabla creada correctamente. Ahora puedes añadir campos.', 'success')
@@ -94,7 +106,8 @@ def add_field(table_id):
         flash('Campo añadido correctamente.', 'success')
         return redirect(url_for('tables.edit_table', table_id=table_id))
     
-    return render_template('tables/field_form.html', table=table)
+    field_types = TableField.FieldTypes.choices()
+    return render_template('tables/field_form.html', table=table, field_types=field_types, field=None)
 
 @bp.route('/<int:table_id>/fields/<int:field_id>/edit', methods=['GET', 'POST'])
 def edit_field(table_id, field_id):
@@ -112,7 +125,8 @@ def edit_field(table_id, field_id):
         flash('Campo actualizado correctamente.', 'success')
         return redirect(url_for('tables.edit_table', table_id=table_id))
     
-    return render_template('tables/field_form.html', table=field.table, field=field)
+    field_types = TableField.FieldTypes.choices()
+    return render_template('tables/field_form.html', table=field.table, field=field, field_types=field_types)
 
 @bp.route('/<int:table_id>/fields/<int:field_id>/delete', methods=['POST'])
 def delete_field(table_id, field_id):
@@ -128,8 +142,55 @@ def delete_field(table_id, field_id):
 def delete_table(table_id):
     """Eliminar una tabla"""
     table = DynamicTable.query.get_or_404(table_id)
+    table_name = table.name
+
+    engine = db.engine
+    inspector = inspect(engine)
+
+    if table_name not in inspector.get_table_names():
+        # Solo eliminar el registro meta si la tabla ya no existe físicamente
+        db.session.delete(table)
+        db.session.commit()
+        flash('Registro de tabla eliminado. La tabla física ya no existía.', 'info')
+        return redirect(url_for('tables.index'))
+
+    # Verificar dependencias referenciales
+    fk_constraints = inspector.get_foreign_keys(table_name)
+    if fk_constraints:
+        flash('No se puede eliminar la tabla porque tiene claves foráneas definidas.', 'error')
+        return redirect(url_for('tables.edit_table', table_id=table_id))
+
+    # Revisar si otras tablas referencian a esta tabla
+    referencing = []
+    for other_table in inspector.get_table_names():
+        if other_table == table_name:
+            continue
+        foreign_keys = inspector.get_foreign_keys(other_table)
+        for fk in foreign_keys:
+            if fk.get('referred_table') == table_name:
+                referencing.append(other_table)
+                break
+
+    if referencing:
+        ref_list = ', '.join(referencing)
+        flash(f'No se puede eliminar la tabla porque está referenciada por: {ref_list}.', 'error')
+        return redirect(url_for('tables.edit_table', table_id=table_id))
+
+    # Comprobar registros existentes
+    count = db.session.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar()
+    if count and count > 0:
+        flash(f'La tabla contiene {count} registros. Vacíala antes de eliminarla.', 'error')
+        return redirect(url_for('tables.edit_table', table_id=table_id))
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(f'DROP TABLE "{table_name}"'))
+            conn.commit()
+    except Exception as exc:
+        flash(f'No se pudo eliminar la tabla física: {exc}', 'error')
+        return redirect(url_for('tables.edit_table', table_id=table_id))
+
     db.session.delete(table)
     db.session.commit()
-    
-    flash('Tabla eliminada correctamente.', 'success')
+    flash(f'Tabla "{table_name}" eliminada correctamente.', 'success')
     return redirect(url_for('tables.index'))

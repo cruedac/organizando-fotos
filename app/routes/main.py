@@ -12,6 +12,11 @@ from pathlib import Path
 def index():
     return render_template('index.html')
 
+
+@bp.route('/fotos')
+def photos():
+    return render_template('photos/analysis.html')
+
 @bp.route('/list-drives', methods=['GET'])
 def list_drives():
     """Lista todas las unidades disponibles en Windows"""
@@ -39,6 +44,9 @@ def list_drives():
 def list_directory():
     """Lista el contenido de un directorio"""
     path = request.args.get('path', '')
+    include_files = request.args.get('include_files', '')
+    include_files = str(include_files).lower() in ('1', 'true', 'yes')
+
     if not path:
         return jsonify({'error': 'No se proporcionó una ruta'}), 400
     
@@ -56,11 +64,17 @@ def list_directory():
                         'name': item.name,
                         'type': 'directory'
                     })
+                elif include_files and item.is_file():
+                    items.append({
+                        'path': str(item),
+                        'name': item.name,
+                        'type': 'file'
+                    })
             except PermissionError:
                 continue
         
-        # Ordenar por nombre
-        items.sort(key=lambda x: x['name'].lower())
+        # Ordenar: directorios primero, luego archivos, ambos por nombre
+        items.sort(key=lambda x: (0 if x['type'] != 'file' else 1, x['name'].lower()))
         return jsonify(items)
     
     except Exception as e:

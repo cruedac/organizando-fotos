@@ -92,10 +92,12 @@ def import_sql_file(sql_path=None, app=None):
                 sql_text = f.read()
 
             # Evitar fallos por UNIQUE constraint cambiando INSERT INTO por
-            # INSERT OR IGNORE para tablas movies/extras (SQLite)
+            # INSERT OR IGNORE para la tabla movies (SQLite). La tabla extras
+            # dejó de existir, así que eliminamos cualquier referencia.
             import re
             sql_text_mod = re.sub(r"INSERT\s+INTO\s+movies", "INSERT OR IGNORE INTO movies", sql_text, flags=re.I)
-            sql_text_mod = re.sub(r"INSERT\s+INTO\s+extras", "INSERT OR IGNORE INTO extras", sql_text_mod, flags=re.I)
+            sql_text_mod = re.sub(r"(?is)CREATE\s+TABLE\s+[\"`]?extras[\"`]?\s*\(.*?\);\s*", "", sql_text_mod)
+            sql_text_mod = re.sub(r"(?im)^[^\n]*INSERT\s+INTO\s+[\"`]?extras[\"`]?[^;]*;\s*", "", sql_text_mod)
 
             cursor = raw_conn.cursor()
             try:

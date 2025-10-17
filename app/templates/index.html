@@ -3,82 +3,42 @@
 {% block title %}Inicio - Organizador Multimedia{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Análisis de Archivos Multimedia</h5>
-                
-                <div class="mb-4">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="folderPath" 
-                               placeholder="Ruta de la carpeta a analizar" readonly>
-                        <button class="btn btn-primary" id="selectFolder">
-                            Seleccionar Carpeta
-                        </button>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h2 class="card-title mb-3">Bienvenido al Organizador Multimedia</h2>
+                <p class="text-muted mb-4">
+                    Gestiona tus fotos, videos y configuraciones desde un único lugar. Usa el menú superior para acceder a cada módulo.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <h5>Fotos</h5>
+                            <p class="small text-muted">Analiza tus carpetas para conocer cuántos archivos multimedia tienes y su distribución por tipo.</p>
+                            <a class="btn btn-primary" href="{{ url_for('main.photos') }}">
+                                Ir a Análisis de Fotos
+                            </a>
+                        </div>
                     </div>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" id="scanSubdirs" checked>
-                        <label class="form-check-label" for="scanSubdirs">
-                            Incluir subdirectorios en el análisis
-                        </label>
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <h5>Videos</h5>
+                            <p class="small text-muted">Consulta y administra tu catálogo de videos importados desde las cintas legacy.</p>
+                            <a class="btn btn-outline-primary" href="{{ url_for('videos.index') }}">
+                                Abrir módulo de Videos
+                            </a>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Modal del Explorador de Archivos -->
-                <div class="modal fade" id="folderExplorerModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Seleccionar Carpeta</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <nav aria-label="Navegación de carpetas">
-                                    <ol class="breadcrumb" id="pathBreadcrumb">
-                                        <li class="breadcrumb-item active">Unidades</li>
-                                    </ol>
-                                </nav>
-                                <div class="list-group" id="folderList" style="max-height: 400px; overflow-y: auto;">
-                                    <!-- Los elementos se cargarán dinámicamente -->
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-primary" id="selectCurrentFolder" disabled>Seleccionar Esta Carpeta</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="d-grid gap-2 mb-4">
-                    <button class="btn btn-success" id="scanButton" disabled>
-                        Analizar Contenido
-                    </button>
-                </div>
-                
-                <div id="results" class="mt-4" style="display: none;">
-                    <h6 class="border-bottom pb-2 mb-3">Resultados del Análisis</h6>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-subtitle mb-3 text-muted">Resumen por Tipo</h6>
-                                    <ul class="list-unstyled" id="totalsList">
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-subtitle mb-3 text-muted">Desglose por Extensión</h6>
-                                    <ul class="list-unstyled" id="extensionList">
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="mt-4">
+                    <h5>Mantenimiento</h5>
+                    <p class="small text-muted">Actualiza tipos de archivos, tablas dinámicas y otras configuraciones del sistema.</p>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('maintenance.index') }}">
+                        Ir a Mantenimiento
+                    </a>
                 </div>
             </div>
         </div>
@@ -86,170 +46,4 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const folderExplorerModal = new bootstrap.Modal(document.getElementById('folderExplorerModal'));
-    let currentPath = '';
-    
-    // Función para actualizar la lista de carpetas
-    async function updateFolderList(path) {
-        const folderList = document.getElementById('folderList');
-        const pathBreadcrumb = document.getElementById('pathBreadcrumb');
-        const selectButton = document.getElementById('selectCurrentFolder');
-        
-        try {
-            let response;
-            if (!path) {
-                // Listar unidades
-                response = await fetch('/list-drives');
-                pathBreadcrumb.innerHTML = '<li class="breadcrumb-item active">Unidades</li>';
-                selectButton.disabled = true;
-            } else {
-                // Listar contenido del directorio
-                response = await fetch(`/list-directory?path=${encodeURIComponent(path)}`);
-                
-                // Actualizar breadcrumb
-                const parts = path.split('\\');
-                let breadcrumbHtml = '<li class="breadcrumb-item"><a href="#" data-path="">Unidades</a></li>';
-                let currentPath = '';
-                parts.forEach((part, index) => {
-                    if (part) {
-                        currentPath += part + (index < parts.length - 1 ? '\\' : '');
-                        breadcrumbHtml += `<li class="breadcrumb-item ${index === parts.length - 1 ? 'active' : ''}">
-                            ${index === parts.length - 1 ? part : `<a href="#" data-path="${currentPath}">${part}</a>`}
-                        </li>`;
-                    }
-                });
-                pathBreadcrumb.innerHTML = breadcrumbHtml;
-                selectButton.disabled = false;
-            }
-            
-            const data = await response.json();
-            if (response.ok) {
-                let html = '';
-                data.forEach(item => {
-                    if (item.type === 'directory' || item.type === 'drive') {
-                        html += `
-                            <a href="#" class="list-group-item list-group-item-action" data-path="${item.path}">
-                                <i class="bi ${item.type === 'drive' ? 'bi-hdd' : 'bi-folder'}"></i>
-                                ${item.name}
-                            </a>`;
-                    }
-                });
-                folderList.innerHTML = html || '<div class="list-group-item">No hay carpetas en esta ubicación</div>';
-            } else {
-                folderList.innerHTML = `<div class="list-group-item text-danger">${data.error}</div>`;
-            }
-        } catch (error) {
-            folderList.innerHTML = `<div class="list-group-item text-danger">Error al cargar el contenido: ${error}</div>`;
-        }
-    }
-    
-    // Evento para abrir el modal
-    document.getElementById('selectFolder').addEventListener('click', () => {
-        currentPath = '';
-        updateFolderList('');
-        folderExplorerModal.show();
-    });
-
-    // Eventos de navegación
-    document.getElementById('folderList').addEventListener('click', (e) => {
-        e.preventDefault();
-        const item = e.target.closest('[data-path]');
-        if (item) {
-            currentPath = item.dataset.path;
-            updateFolderList(currentPath);
-        }
-    });
-
-    // Navegación por breadcrumb
-    document.getElementById('pathBreadcrumb').addEventListener('click', (e) => {
-        e.preventDefault();
-        const link = e.target.closest('[data-path]');
-        if (link) {
-            currentPath = link.dataset.path;
-            updateFolderList(currentPath);
-        }
-    });
-
-    // Selección de carpeta
-    document.getElementById('selectCurrentFolder').addEventListener('click', () => {
-        if (currentPath) {
-            document.getElementById('folderPath').value = currentPath;
-            document.getElementById('scanButton').disabled = false;
-            folderExplorerModal.hide();
-        }
-    });
-
-    document.getElementById('scanButton').addEventListener('click', async () => {
-        const folderPath = document.getElementById('folderPath').value;
-        const scanSubdirs = document.getElementById('scanSubdirs').checked;
-        
-        if (!folderPath) {
-            alert('Por favor, selecciona una carpeta primero.');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/scan', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    folder_path: folderPath,
-                    scan_subdirs: scanSubdirs
-                }),
-            });
-            
-            const data = await response.json();
-            if (response.ok) {
-                displayResults(data);
-            } else {
-                alert('Error: ' + data.error);
-            }
-        } catch (error) {
-            alert('Error al analizar la carpeta: ' + error);
-        }
-    });
-});
-
-function displayResults(data) {
-    const results = document.getElementById('results');
-    const totalsList = document.getElementById('totalsList');
-    const extensionList = document.getElementById('extensionList');
-    
-    // Mostrar totales con iconos
-    const typeIcons = {
-        'image': '🖼️',
-        'video': '🎥',
-        'audio': '🎵',
-        'other': '📄'
-    };
-    
-    totalsList.innerHTML = Object.entries(data.totals)
-        .map(([type, count]) => 
-            `<li class="mb-2">
-                <span class="fs-5">${typeIcons[type]}</span>
-                <strong class="ms-2">${type}:</strong> 
-                <span class="badge bg-primary ms-2">${count}</span>
-            </li>`
-        )
-        .join('');
-    
-    // Mostrar desglose por extensión
-    extensionList.innerHTML = Object.entries(data.by_extension)
-        .sort(([,a], [,b]) => b - a) // Ordenar por cantidad
-        .map(([ext, count]) => 
-            `<li class="mb-2">
-                <strong>${ext || 'sin extensión'}:</strong> 
-                <span class="badge bg-secondary ms-2">${count}</span>
-            </li>`
-        )
-        .join('');
-    
-    results.style.display = 'block';
-}
-</script>
-{% endblock %}
+{% block scripts %}{% endblock %}

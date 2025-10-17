@@ -7,49 +7,78 @@
     <div class="col-md-8">
         <h2>{% if movie %}Editar Película #{{ movie.num }}{% else %}Agregar Película{% endif %}</h2>
 
+        {% set data = form_data or {} %}
+        {% set supports = support_types or [] %}
+
         <form method="post">
             <div class="mb-3">
                 <label class="form-label">NUM</label>
                 {% if movie %}
                     <input class="form-control" name="num" value="{{ movie.num }}" readonly />
                 {% else %}
-                    <input class="form-control" name="num" required />
+                    <input class="form-control" name="num" value="{{ data.get('num', '') }}" required />
                 {% endif %}
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Título original</label>
-                <input class="form-control" name="originaltitle" value="{{ movie.originaltitle if movie else '' }}" />
+                <input class="form-control" name="originaltitle" value="{{ data.get('originaltitle', movie.originaltitle if movie else '') }}" />
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Título traducido</label>
-                <input class="form-control" name="translatedtitle" value="{{ movie.translatedtitle if movie else '' }}" />
+                <input class="form-control" name="translatedtitle" value="{{ data.get('translatedtitle', movie.translatedtitle if movie else '') }}" />
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Formato</label>
-                <input class="form-control" name="formattedtitle" value="{{ movie.formattedtitle if movie else '' }}" />
+                <input class="form-control" name="formattedtitle" value="{{ data.get('formattedtitle', movie.formattedtitle if movie else '') }}" />
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Año</label>
-                <input class="form-control" name="year" type="number" value="{{ movie.year if movie else '' }}" />
+                <input class="form-control" name="year" type="number" value="{{ data.get('year', movie.year if movie else '') }}" />
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Categoría</label>
-                <input class="form-control" name="category" value="{{ movie.category if movie else '' }}" />
+                <input class="form-control" name="category" value="{{ data.get('category', movie.category if movie else '') }}" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Tipo de medio</label>
-                <input class="form-control" name="mediatype" value="{{ movie.mediatype if movie else '' }}" />
+                <label class="form-label" for="mediatype">Tipo de soporte</label>
+                {% set selected_support = data.get('mediatype', movie.mediatype if movie else '') or '' %}
+                {% set support_labels = supports | map(attribute='tipo') | list %}
+                <select class="form-select" id="mediatype" name="mediatype">
+                    <option value="" {% if selected_support == '' %}selected{% endif %}>Sin especificar</option>
+                    {% if selected_support and selected_support not in support_labels %}
+                    <option value="{{ selected_support }}" selected disabled>
+                        Valor no registrado: {{ selected_support }}
+                    </option>
+                    {% endif %}
+                    {% for support in supports %}
+                    <option value="{{ support.tipo }}" {% if selected_support == support.tipo %}selected{% endif %}>{{ support.tipo }}</option>
+                    {% endfor %}
+                </select>
+                {% if not supports %}
+                <div class="form-text text-warning">No hay tipos de soporte registrados. Crea uno en Mantenimiento → Tipos de Soporte.</div>
+                {% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Ruta del archivo (FILEPATH)</label>
+                <div class="input-group">
+                    <input class="form-control" id="filepathInput" name="filepath" value="{{ data.get('filepath', movie.filepath if movie else '') }}" placeholder="Selecciona un archivo del equipo" autocomplete="off" spellcheck="false" />
+                    <button class="btn btn-outline-secondary" type="button" id="openFilePicker">
+                        Buscar...
+                    </button>
+                </div>
+                <div class="form-text">Explora el sistema de archivos para vincular el archivo físico asociado al video.</div>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Descripción</label>
-                <textarea class="form-control" name="description" rows="4">{{ movie.description if movie else '' }}</textarea>
+                <textarea class="form-control" name="description" rows="4">{{ data.get('description', movie.description if movie else '') }}</textarea>
             </div>
 
             <button class="btn btn-primary" type="submit">Guardar</button>
@@ -57,4 +86,179 @@
         </form>
     </div>
 </div>
+
+<!-- Modal Explorador de Archivos -->
+<div class="modal fade" id="fileExplorerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Seleccionar archivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <nav aria-label="Navegación de carpetas">
+                    <ol class="breadcrumb" id="fileBreadcrumb">
+                        <li class="breadcrumb-item active">Unidades</li>
+                    </ol>
+                </nav>
+                <div class="list-group" id="fileList" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="selectFileButton" disabled>Seleccionar archivo</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modalEl = document.getElementById('fileExplorerModal');
+    if (!modalEl) {
+        return;
+    }
+
+    const fileModal = new bootstrap.Modal(modalEl);
+    const listEl = document.getElementById('fileList');
+    const breadcrumbEl = document.getElementById('fileBreadcrumb');
+    const selectBtn = document.getElementById('selectFileButton');
+    const openBtn = document.getElementById('openFilePicker');
+    const inputEl = document.getElementById('filepathInput');
+
+    let currentPath = '';
+    let selectedFile = null;
+
+    async function loadEntries(path) {
+        try {
+            let response;
+            if (!path) {
+                response = await fetch('/list-drives');
+                breadcrumbEl.innerHTML = '<li class="breadcrumb-item active">Unidades</li>';
+                selectedFile = null;
+                selectBtn.disabled = true;
+            } else {
+                const url = `/list-directory?path=${encodeURIComponent(path)}&include_files=1`;
+                response = await fetch(url);
+            }
+
+            const data = await response.json();
+
+            if (!path && Array.isArray(data)) {
+                renderList(data, path);
+                return;
+            }
+
+            if (!response.ok) {
+                listEl.innerHTML = `<div class="list-group-item text-danger">${data.error || 'Error al cargar la ruta'}</div>`;
+                return;
+            }
+
+            updateBreadcrumb(path);
+            renderList(data, path);
+        } catch (error) {
+            listEl.innerHTML = `<div class="list-group-item text-danger">Error: ${error}</div>`;
+        }
+    }
+
+    function updateBreadcrumb(path) {
+        if (!path) {
+            breadcrumbEl.innerHTML = '<li class="breadcrumb-item active">Unidades</li>';
+            return;
+        }
+
+        const parts = path.split('\\');
+        let breadcrumbHtml = '<li class="breadcrumb-item"><a href="#" data-path="" data-type="root">Unidades</a></li>';
+        let buildingPath = '';
+        parts.forEach((part, index) => {
+            if (!part) {
+                return;
+            }
+            buildingPath += part;
+            const isLast = index === parts.length - 1;
+            breadcrumbHtml += `<li class="breadcrumb-item ${isLast ? 'active' : ''}">
+                ${isLast ? part : `<a href="#" data-path="${buildingPath}" data-type="directory">${part}</a>`}
+            </li>`;
+            buildingPath += '\\';
+        });
+        breadcrumbEl.innerHTML = breadcrumbHtml;
+    }
+
+    function renderList(items, path) {
+        if (!Array.isArray(items) || items.length === 0) {
+            listEl.innerHTML = '<div class="list-group-item">No hay elementos en esta ubicación</div>';
+            return;
+        }
+
+        let html = '';
+        items.forEach(item => {
+            const type = item.type;
+            const icon = type === 'file' ? 'bi-file-earmark' : (type === 'drive' ? 'bi-hdd' : 'bi-folder');
+            html += `
+                <a href="#" class="list-group-item list-group-item-action" data-path="${item.path}" data-type="${type}">
+                    <i class="bi ${icon}"></i>
+                    <span class="ms-2">${item.name}</span>
+                </a>`;
+        });
+        listEl.innerHTML = html;
+
+        selectedFile = null;
+        selectBtn.disabled = true;
+    }
+
+    function setActiveItem(element) {
+        listEl.querySelectorAll('.list-group-item').forEach(el => el.classList.remove('active'));
+        if (element) {
+            element.classList.add('active');
+        }
+    }
+
+    openBtn?.addEventListener('click', () => {
+        currentPath = '';
+        selectedFile = null;
+        selectBtn.disabled = true;
+        loadEntries('');
+        fileModal.show();
+    });
+
+    listEl.addEventListener('click', (event) => {
+        event.preventDefault();
+        const item = event.target.closest('[data-path]');
+        if (!item) {
+            return;
+        }
+        const itemPath = item.dataset.path;
+        const itemType = item.dataset.type;
+
+        if (itemType === 'file') {
+            selectedFile = itemPath;
+            setActiveItem(item);
+            selectBtn.disabled = false;
+        } else {
+            currentPath = itemPath;
+            loadEntries(currentPath);
+        }
+    });
+
+    breadcrumbEl.addEventListener('click', (event) => {
+        const link = event.target.closest('[data-path]');
+        if (!link) {
+            return;
+        }
+        event.preventDefault();
+        currentPath = link.dataset.path || '';
+        loadEntries(currentPath);
+    });
+
+    selectBtn.addEventListener('click', () => {
+        if (!selectedFile) {
+            return;
+        }
+        inputEl.value = selectedFile;
+        fileModal.hide();
+    });
+});
+</script>
 {% endblock %}
