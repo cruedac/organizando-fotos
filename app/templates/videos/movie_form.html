@@ -4,85 +4,80 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-8">
+    <div class="col-lg-9 col-md-10">
         <h2>{% if movie %}Editar Película #{{ movie.num }}{% else %}Agregar Película{% endif %}</h2>
 
         {% set data = form_data or {} %}
         {% set supports = support_types or [] %}
+        {% set sections = field_sections or [] %}
 
         <form method="post">
             <div class="mb-3">
-                <label class="form-label">NUM</label>
+                <label class="form-label" for="field_num">NUM</label>
                 {% if movie %}
-                    <input class="form-control" name="num" value="{{ movie.num }}" readonly />
+                    <input class="form-control" id="field_num" name="num" value="{{ movie.num }}" readonly />
                 {% else %}
-                    <input class="form-control" name="num" value="{{ data.get('num', '') }}" required />
+                    <input class="form-control" id="field_num" name="num" value="{{ data.get('num', '') }}" readonly />
+                    <div class="form-text">Se asigna automáticamente con el siguiente número disponible.</div>
                 {% endif %}
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Título original</label>
-                <input class="form-control" name="originaltitle" value="{{ data.get('originaltitle', movie.originaltitle if movie else '') }}" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Título traducido</label>
-                <input class="form-control" name="translatedtitle" value="{{ data.get('translatedtitle', movie.translatedtitle if movie else '') }}" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Formato</label>
-                <input class="form-control" name="formattedtitle" value="{{ data.get('formattedtitle', movie.formattedtitle if movie else '') }}" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Año</label>
-                <input class="form-control" name="year" type="number" value="{{ data.get('year', movie.year if movie else '') }}" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Categoría</label>
-                <input class="form-control" name="category" value="{{ data.get('category', movie.category if movie else '') }}" />
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label" for="mediatype">Tipo de soporte</label>
-                {% set selected_support = data.get('mediatype', movie.mediatype if movie else '') or '' %}
-                {% set support_labels = supports | map(attribute='tipo') | list %}
-                <select class="form-select" id="mediatype" name="mediatype">
-                    <option value="" {% if selected_support == '' %}selected{% endif %}>Sin especificar</option>
-                    {% if selected_support and selected_support not in support_labels %}
-                    <option value="{{ selected_support }}" selected disabled>
-                        Valor no registrado: {{ selected_support }}
-                    </option>
-                    {% endif %}
-                    {% for support in supports %}
-                    <option value="{{ support.tipo }}" {% if selected_support == support.tipo %}selected{% endif %}>{{ support.tipo }}</option>
-                    {% endfor %}
-                </select>
-                {% if not supports %}
-                <div class="form-text text-warning">No hay tipos de soporte registrados. Crea uno en Mantenimiento → Tipos de Soporte.</div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Ruta del archivo (FILEPATH)</label>
-                <div class="input-group">
-                    <input class="form-control" id="filepathInput" name="filepath" value="{{ data.get('filepath', movie.filepath if movie else '') }}" placeholder="Selecciona un archivo del equipo" autocomplete="off" spellcheck="false" />
-                    <button class="btn btn-outline-secondary" type="button" id="openFilePicker">
-                        Buscar...
-                    </button>
+            {% for section in sections %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ section.title }}</h5>
                 </div>
-                <div class="form-text">Explora el sistema de archivos para vincular el archivo físico asociado al video.</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for field in section.fields %}
+                        {% set field_name = field.name %}
+                        {% set value = data.get(field_name, '') %}
+                        {% set col = field.width or 6 %}
+                        <div class="col-12 col-md-{{ col }}">
+                            <label class="form-label" for="field_{{ field_name }}">{{ field.label }}</label>
+                            {% if field.input == 'textarea' %}
+                            <textarea class="form-control" id="field_{{ field_name }}" name="{{ field_name }}" rows="{{ field.rows or 3 }}">{{ value }}</textarea>
+                            {% elif field.input == 'support' %}
+                            {% set selected_support = value or '' %}
+                            {% set support_labels = supports | map(attribute='tipo') | list %}
+                            <select class="form-select" id="field_{{ field_name }}" name="{{ field_name }}">
+                                <option value="" {% if selected_support == '' %}selected{% endif %}>Sin especificar</option>
+                                {% if selected_support and selected_support not in support_labels %}
+                                <option value="{{ selected_support }}" selected disabled>Valor no registrado: {{ selected_support }}</option>
+                                {% endif %}
+                                {% for support in supports %}
+                                <option value="{{ support.tipo }}" {% if selected_support == support.tipo %}selected{% endif %}>{{ support.tipo }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if not supports %}
+                            <div class="form-text text-warning">No hay tipos de soporte registrados. Crea uno en Mantenimiento → Tipos de Soporte.</div>
+                            {% endif %}
+                            {% elif field.input == 'date' %}
+                            <input type="date" class="form-control" id="field_{{ field_name }}" name="{{ field_name }}" value="{{ value }}" />
+                            {% elif field.input == 'float' %}
+                            <input type="number" step="0.01" class="form-control" id="field_{{ field_name }}" name="{{ field_name }}" value="{{ value }}" />
+                            {% elif field.input == 'int' %}
+                            <input type="number" class="form-control" id="field_{{ field_name }}" name="{{ field_name }}" value="{{ value }}" />
+                            {% elif field.input == 'filepath' %}
+                            <div class="input-group">
+                                <input class="form-control" id="filepathInput" name="{{ field_name }}" value="{{ value }}" placeholder="Selecciona un archivo del equipo" autocomplete="off" spellcheck="false" />
+                                <button class="btn btn-outline-secondary" type="button" id="openFilePicker">Buscar...</button>
+                            </div>
+                            <div class="form-text">Explora el sistema de archivos para vincular el archivo físico asociado al video.</div>
+                            {% else %}
+                            <input type="text" class="form-control" id="field_{{ field_name }}" name="{{ field_name }}" value="{{ value }}" />
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
+            {% endfor %}
 
-            <div class="mb-3">
-                <label class="form-label">Descripción</label>
-                <textarea class="form-control" name="description" rows="4">{{ data.get('description', movie.description if movie else '') }}</textarea>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Guardar</button>
+                <a class="btn btn-secondary" href="{{ url_for('videos.manage') }}">Cancelar</a>
             </div>
-
-            <button class="btn btn-primary" type="submit">Guardar</button>
-            <a class="btn btn-secondary" href="{{ url_for('videos.manage') }}">Cancelar</a>
         </form>
     </div>
 </div>

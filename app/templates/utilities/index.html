@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Utilidades - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <h2 class="mb-3">Utilidades</h2>
+        <p class="text-muted">Herramientas complementarias para trabajar con archivos multimedia y la base de datos. Selecciona una opción para continuar.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Tablas personalizadas</h5>
+                <p class="card-text text-muted">Administra las tablas dinámicas creadas desde la aplicación, añade campos y gestiona sus registros.</p>
+                <div class="mt-auto">
+                    <a class="btn btn-primary" href="{{ url_for('tables.index') }}">Gestionar tablas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Analizar un archivo multimedia</h5>
+                <p class="card-text text-muted">Sube un archivo individual para revisar metadatos, formato y compatibilidad antes de incorporarlo al catálogo.</p>
+                <div class="mt-auto">
+                    <a class="btn btn-primary" href="{{ url_for('main.analyze_media_file') }}">Abrir analizador</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Exportar datos</h5>
+                <p class="card-text text-muted">Genera copias de las tablas en formatos SQL o CSV para respaldos, migraciones o análisis externos.</p>
+                <div class="mt-auto">
+                    <button class="btn btn-outline-primary" type="button" disabled>Próximamente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

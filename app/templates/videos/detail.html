@@ -20,130 +20,77 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Información Principal -->
-                <div class="row mb-4">
-                    <div class="col-md-8">
-                        {% if video.description %}
-                        <h5>Descripción</h5>
-                        <p class="text-justify">{{ video.description | nl2br }}</p>
+                {% for section in detail_sections %}
+                <div class="mb-4">
+                    <h5>{{ section.title }}</h5>
+                    <dl class="row">
+                        {% for item in section.rows %}
+                        {% set field = item.field %}
+                        {% if field.input == 'textarea' %}
+                        <dt class="col-12">{{ field.label }}</dt>
+                        <dd class="col-12">
+                            {% if item.empty %}
+                            <span class="text-muted">{{ item.value }}</span>
+                            {% else %}
+                            {{ item.value | nl2br }}
+                            {% endif %}
+                        </dd>
+                        {% elif field.input == 'filepath' %}
+                        <dt class="col-sm-3 col-md-2">{{ field.label }}</dt>
+                        <dd class="col-sm-9 col-md-10">
+                            {% if item.empty %}
+                            <span class="text-muted">{{ item.value }}</span>
+                            {% else %}
+                            <div class="d-flex align-items-start gap-2">
+                                <code class="text-break">{{ item.value }}</code>
+                                <button class="btn btn-sm btn-outline-secondary copy-path-btn" type="button" data-path="{{ item.value }}">Copiar</button>
+                            </div>
+                            {% endif %}
+                        </dd>
+                        {% else %}
+                        <dt class="col-sm-3 col-md-2">{{ field.label }}</dt>
+                        <dd class="col-sm-9 col-md-10">
+                            {% if item.empty %}
+                            <span class="text-muted">{{ item.value }}</span>
+                            {% else %}
+                            {{ item.value }}
+                            {% endif %}
+                        </dd>
                         {% endif %}
-                        
-                        {% if video.comments %}
-                        <h5>Comentarios</h5>
-                        <p class="text-justify">{{ video.comments | nl2br }}</p>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4">
-                        <h5>Detalles</h5>
-                        <dl class="row">
-                            {% if video.mediatype %}
-                            <dt class="col-sm-4">Tipo</dt>
-                            <dd class="col-sm-8">{{ video.mediatype }}</dd>
-                            {% endif %}
-
-                            {% if video.filepath %}
-                            <dt class="col-sm-4">Ruta</dt>
-                            <dd class="col-sm-8">
-                                <div class="d-flex align-items-start gap-2">
-                                    <code class="text-break">{{ video.filepath }}</code>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" id="copyFilepathBtn" data-path="{{ video.filepath }}">Copiar</button>
-                                </div>
-                            </dd>
-                            {% endif %}
-
-                            {% if video.media %}
-                            <dt class="col-sm-4">Medio</dt>
-                            <dd class="col-sm-8">{{ video.media }}</dd>
-                            {% endif %}
-
-                            {% if video.source %}
-                            <dt class="col-sm-4">Fuente</dt>
-                            <dd class="col-sm-8">{{ video.source }}</dd>
-                            {% endif %}
-
-                            {% if video.category %}
-                            <dt class="col-sm-4">Categoría</dt>
-                            <dd class="col-sm-8">{{ video.category }}</dd>
-                            {% endif %}
-
-                            {% if video.length %}
-                            <dt class="col-sm-4">Duración</dt>
-                            <dd class="col-sm-8">{{ video.length }} min</dd>
-                            {% endif %}
-
-                            {% if video.dateadded %}
-                            <dt class="col-sm-4">Añadido</dt>
-                            <dd class="col-sm-8">{{ video.dateadded.strftime('%d/%m/%Y') }}</dd>
-                            {% endif %}
-                        </dl>
-                    </div>
+                        {% endfor %}
+                    </dl>
                 </div>
-
-                <!-- Detalles Técnicos -->
-                {% if video.videoformat or video.audioformat or video.resolution or video.framerate %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <h5>Especificaciones Técnicas</h5>
-                        <dl class="row">
-                            {% if video.videoformat %}
-                            <dt class="col-sm-2">Formato Video</dt>
-                            <dd class="col-sm-4">{{ video.videoformat }}</dd>
-                            {% endif %}
-
-                            {% if video.audioformat %}
-                            <dt class="col-sm-2">Formato Audio</dt>
-                            <dd class="col-sm-4">{{ video.audioformat }}</dd>
-                            {% endif %}
-
-                            {% if video.resolution %}
-                            <dt class="col-sm-2">Resolución</dt>
-                            <dd class="col-sm-4">{{ video.resolution }}</dd>
-                            {% endif %}
-
-                            {% if video.framerate %}
-                            <dt class="col-sm-2">Framerate</dt>
-                            <dd class="col-sm-4">{{ video.framerate }}</dd>
-                            {% endif %}
-
-                            {% if video.videobitrate %}
-                            <dt class="col-sm-2">Bitrate Video</dt>
-                            <dd class="col-sm-4">{{ video.videobitrate }}</dd>
-                            {% endif %}
-
-                            {% if video.audiobitrate %}
-                            <dt class="col-sm-2">Bitrate Audio</dt>
-                            <dd class="col-sm-4">{{ video.audiobitrate }}</dd>
-                            {% endif %}
-                        </dl>
-                    </div>
-                </div>
-                {% endif %}
-
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-    {% block scripts %}
-    {{ super() }}
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const copyBtn = document.getElementById('copyFilepathBtn');
-        if (!copyBtn) {
-            return;
-        }
-        copyBtn.addEventListener('click', async function () {
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const buttons = document.querySelectorAll('.copy-path-btn');
+    if (!buttons.length) {
+        return;
+    }
+    buttons.forEach((button) => {
+        button.addEventListener('click', async function () {
             try {
-                await navigator.clipboard.writeText(copyBtn.dataset.path || '');
-                copyBtn.textContent = 'Copiado';
-                setTimeout(() => copyBtn.textContent = 'Copiar', 2000);
+                await navigator.clipboard.writeText(button.dataset.path || '');
+                const originalText = button.textContent;
+                button.textContent = 'Copiado';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
             } catch (error) {
-                copyBtn.classList.remove('btn-outline-secondary');
-                copyBtn.classList.add('btn-outline-danger');
-                copyBtn.textContent = 'Error';
+                button.classList.remove('btn-outline-secondary');
+                button.classList.add('btn-outline-danger');
+                button.textContent = 'Error';
             }
         });
     });
-    </script>
-    {% endblock %}
+});
+</script>
+{% endblock %}

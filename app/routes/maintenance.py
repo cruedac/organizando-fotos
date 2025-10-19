@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file
 from sqlalchemy import func, text
 from app.models.database import db, FileType, TipoSoporte, DynamicTable
 from app.models.movie import Movie
@@ -8,6 +8,8 @@ import shutil
 import datetime
 import os
 from markupsafe import Markup, escape
+import csv
+import io
 
 bp = Blueprint('maintenance', __name__, url_prefix='/maintenance')
 
@@ -92,6 +94,86 @@ def _resolve_table_actions(table_name: str) -> dict:
         }
 
     return {'has_action': False, 'label': None, 'url': None, 'can_drop': True}
+
+
+def _serialize_sql_value(value) -> str:
+    """Convierte un valor de Python a su representación SQL segura."""
+    if value is None:
+        return 'NULL'
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (bytes, bytearray)):
+        return "X'" + value.hex() + "'"
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _export_table_sql(table_name: str):
+    """Genera un fichero SQL plano con la definicion y datos de la tabla."""
+    engine = db.engine
+    inspector = inspect(engine)
+    if table_name not in inspector.get_table_names():
+        raise ValueError(f'La tabla "{table_name}" no existe.')
+
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    with engine.connect() as conn:
+        create_stmt = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name=:name"),
+            {'name': table_name}
+        ).scalar() or f'-- No se encontro la definicion de la tabla {table_name}'
+        columns = [col['name'] for col in inspector.get_columns(table_name)]
+        rows = conn.execute(text(f'SELECT * FROM "{table_name}"')).fetchall()
+
+    lines = [
+        f'-- Exportacion generada el {datetime.datetime.now().isoformat(timespec="seconds")}',
+        f'-- Tabla: "{table_name}"',
+        ''
+    ]
+
+    normalized_stmt = create_stmt if create_stmt.strip().endswith(';') else create_stmt + ';'
+    lines.append(normalized_stmt)
+    lines.append('')
+
+    if rows:
+        quoted_columns = ', '.join(f'"{col}"' for col in columns)
+        insert_prefix = f'INSERT INTO "{table_name}" ({quoted_columns}) VALUES '
+        for row in rows:
+            mapping = row._mapping if hasattr(row, '_mapping') else dict(zip(columns, row))
+            serialized = [_serialize_sql_value(mapping[column]) for column in columns]
+            lines.append(f'{insert_prefix}({", ".join(serialized)});')
+    else:
+        lines.append('-- La tabla no contiene registros.')
+
+    buffer = io.BytesIO('\n'.join(lines).encode('utf-8'))
+    buffer.seek(0)
+    filename = f'{table_name}_{timestamp}.txt'
+    return buffer, 'text/plain', filename
+
+
+def _export_table_csv(table_name: str):
+    """Genera un CSV UTF-8 con los datos de la tabla."""
+    engine = db.engine
+    inspector = inspect(engine)
+    if table_name not in inspector.get_table_names():
+        raise ValueError(f'La tabla "{table_name}" no existe.')
+
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    with engine.connect() as conn:
+        columns = [col['name'] for col in inspector.get_columns(table_name)]
+        rows = conn.execute(text(f'SELECT * FROM "{table_name}"')).fetchall()
+
+    string_buffer = io.StringIO()
+    writer = csv.writer(string_buffer)
+    writer.writerow(columns)
+    for row in rows:
+        mapping = row._mapping if hasattr(row, '_mapping') else dict(zip(columns, row))
+        writer.writerow([mapping[column] if mapping[column] is not None else '' for column in columns])
+
+    buffer = io.BytesIO(string_buffer.getvalue().encode('utf-8'))
+    buffer.seek(0)
+    filename = f'{table_name}_{timestamp}.csv'
+    return buffer, 'text/csv', filename
 
 
 @bp.route('/')
@@ -279,3 +361,32 @@ def backup_database():
         flash(f'No se pudo crear el backup: {exc}', 'error')
 
     return redirect(url_for('maintenance.index'))
+
+
+@bp.route('/export', methods=['POST'])
+def export_table():
+    """Exporta una tabla a formato SQL plano (.txt) o CSV."""
+    table_name = (request.form.get('table_name') or '').strip()
+    export_format = (request.form.get('export_format') or '').strip().lower()
+
+    if not table_name:
+        flash('Debe seleccionar una tabla para exportar.', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    if export_format not in {'sql', 'csv'}:
+        flash('Formato de exportacion no valido.', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    try:
+        if export_format == 'sql':
+            buffer, mimetype, filename = _export_table_sql(table_name)
+        else:
+            buffer, mimetype, filename = _export_table_csv(table_name)
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('maintenance.index'))
+    except Exception as exc:  # pylint: disable=broad-except
+        flash(f'No se pudo exportar la tabla: {exc}', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    return send_file(buffer, mimetype=mimetype, as_attachment=True, download_name=filename)

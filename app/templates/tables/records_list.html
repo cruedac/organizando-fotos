@@ -51,12 +51,16 @@
                                 {% endfor %}
                                 <td>
                                     <div class="btn-group" role="group">
-                                        <a href="{{ url_for('tables.edit_record', table_id=table.id, record_id=row['id']) }}" class="btn btn-sm btn-outline-primary">Editar</a>
-                                        <form action="{{ url_for('tables.delete_record', table_id=table.id, record_id=row['id']) }}"
+                                        {% if row['__record_id'] is not none %}
+                                        <a href="{{ url_for('tables.edit_record', table_id=table.id, record_id=row['__record_id']) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                                        <form action="{{ url_for('tables.delete_record', table_id=table.id, record_id=row['__record_id']) }}"
                                               method="POST"
                                               onsubmit="return confirm('¿Seguro que quieres eliminar este registro?');">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
                                         </form>
+                                        {% else %}
+                                        <span class="text-muted">Acciones no disponibles</span>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>

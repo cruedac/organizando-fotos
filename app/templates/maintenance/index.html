@@ -42,7 +42,7 @@
                             <tr>
                                 <th>Tabla</th>
                                 <th class="text-end">Registros</th>
-                                <th class="text-end">Acción</th>
+                                <th class="text-end">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -56,11 +56,20 @@
                                 </td>
                                 <td class="text-end">{{ table.count }}</td>
                                 <td class="text-end">
-                                    {% if table.actions.has_action %}
+                                    <div class="btn-group btn-group-sm justify-content-end" role="group">
+                                        {% if table.actions.has_action %}
                                         <a class="btn btn-sm btn-outline-secondary" href="{{ table.actions.url }}">
                                             {{ table.actions.label }}
                                         </a>
-                                    {% endif %}
+                                        {% endif %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary export-table-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#exportModal"
+                                                data-table="{{ table.name }}">
+                                            Exportar
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -70,43 +79,7 @@
             </div>
         </div>
         
-        <div class="row mt-4 g-3">
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Tipos de Archivo</h5>
-                        <p class="card-text">Gestionar extensiones y tipos de archivo soportados.</p>
-                        <a href="{{ url_for('maintenance.file_types') }}" class="btn btn-primary">
-                            Gestionar Tipos de Archivo
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Tablas Personalizadas</h5>
-                        <p class="card-text">Crear y gestionar tablas con campos personalizados.</p>
-                        <a href="{{ url_for('tables.index') }}" class="btn btn-primary">
-                            Gestionar Tablas
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Tipos de Soporte</h5>
-                        <p class="card-text">Mantén el catálogo de soportes físicos o digitales.</p>
-                        <a href="{{ url_for('maintenance.support_types') }}" class="btn btn-primary">
-                            Gestionar Tipos de Soporte
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
     </div>
 </div>
 
@@ -133,6 +106,41 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('maintenance.export_table') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exportModalLabel">Exportar tabla</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="table_name" id="exportTableName">
+                    <div class="mb-3">
+                        <label class="form-label">Selecciona el formato de exportación</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_format" id="exportFormatSql" value="sql" checked>
+                            <label class="form-check-label" for="exportFormatSql">
+                                .TXT (sentencias SQL)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_format" id="exportFormatCsv" value="csv">
+                            <label class="form-check-label" for="exportFormatCsv">
+                                .CSV (valores separados por comas)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Exportar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -141,13 +149,32 @@
 document.addEventListener('DOMContentLoaded', function () {
     const trigger = document.getElementById('openBackupModal');
     const modalEl = document.getElementById('backupModal');
-    if (!trigger || !modalEl) {
-        return;
+    if (trigger && modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        trigger.addEventListener('click', function () {
+            modal.show();
+        });
     }
-    const modal = new bootstrap.Modal(modalEl);
-    trigger.addEventListener('click', function () {
-        modal.show();
-    });
+
+    const exportModal = document.getElementById('exportModal');
+    if (exportModal) {
+        exportModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const tableName = button ? button.getAttribute('data-table') : '';
+            const hiddenField = exportModal.querySelector('#exportTableName');
+            const title = exportModal.querySelector('#exportModalLabel');
+            if (hiddenField) {
+                hiddenField.value = tableName || '';
+            }
+            if (title) {
+                title.textContent = tableName ? `Exportar tabla "${tableName}"` : 'Exportar tabla';
+            }
+            const defaultOption = exportModal.querySelector('#exportFormatSql');
+            if (defaultOption) {
+                defaultOption.checked = true;
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

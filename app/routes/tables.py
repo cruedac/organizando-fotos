@@ -318,7 +318,14 @@ def manage_records(table_id):
         flash('Añade campos a la tabla antes de gestionar sus registros.', 'warning')
         return redirect(url_for('tables.edit_table', table_id=table_id))
 
-    field_names = ', '.join(f'"{f.name}"' for f in fields)
+    select_order = ['id'] + [f.name for f in fields]
+    seen = set()
+    columns = []
+    for name in select_order:
+        if name and name not in seen:
+            columns.append(f'"{name}"')
+            seen.add(name)
+    field_names = ', '.join(columns)
     try:
         result = db.session.execute(text(f'SELECT {field_names} FROM "{table.name}" ORDER BY "id" DESC')).mappings().all()
     except Exception as exc:
@@ -327,7 +334,7 @@ def manage_records(table_id):
 
     rows = []
     for item in result:
-        row = {}
+        row = {'__record_id': item.get('id')}
         for field in fields:
             row[field.name] = _present_value(field, item.get(field.name))
         rows.append(row)

@@ -9,6 +9,8 @@ from app.services.video_import import import_sql_file
 from app import db
 import os
 import json
+from datetime import datetime, date
+from sqlalchemy import func
 
 bp = Blueprint('videos', __name__, url_prefix='/videos')
 
@@ -17,6 +19,182 @@ def nl2br(value):
     """Convierte saltos de línea en etiquetas <br/>"""
     if value:
         return Markup(value.replace('\n', '<br/>'))
+
+MOVIE_FIELD_DEFINITIONS = [
+    {'name': 'num', 'label': 'NUM', 'input': 'int', 'section': 'Identificación y títulos', 'width': 6},
+    {'name': 'originaltitle', 'label': 'Título original', 'input': 'text', 'section': 'Identificación y títulos', 'width': 6},
+    {'name': 'translatedtitle', 'label': 'Título traducido', 'input': 'text', 'section': 'Identificación y títulos', 'width': 6},
+    {'name': 'formattedtitle', 'label': 'Título formateado', 'input': 'text', 'section': 'Identificación y títulos', 'width': 6},
+    {'name': 'checked', 'label': 'Checked', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'colortag', 'label': 'Etiqueta de color', 'input': 'int', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'media', 'label': 'Medio', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'mediatype', 'label': 'Tipo de soporte', 'input': 'support', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'source', 'label': 'Fuente', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'borrower', 'label': 'Prestado a', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'picturestatus', 'label': 'Estado de imagen', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'picturename', 'label': 'Nombre de imagen', 'input': 'text', 'section': 'Estado y soporte', 'width': 6},
+    {'name': 'dateadded', 'label': 'Fecha de alta', 'input': 'date', 'section': 'Fechas y seguimiento', 'width': 6},
+    {'name': 'datewatched', 'label': 'Fecha de visionado', 'input': 'date', 'section': 'Fechas y seguimiento', 'width': 6},
+    {'name': 'userrating', 'label': 'Valoración usuario', 'input': 'float', 'section': 'Calificaciones y clasificación', 'width': 6},
+    {'name': 'rating', 'label': 'Valoración global', 'input': 'float', 'section': 'Calificaciones y clasificación', 'width': 6},
+    {'name': 'category', 'label': 'Categoría', 'input': 'text', 'section': 'Calificaciones y clasificación', 'width': 6},
+    {'name': 'certification', 'label': 'Certificación', 'input': 'text', 'section': 'Calificaciones y clasificación', 'width': 6},
+    {'name': 'country', 'label': 'País', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'year', 'label': 'Año', 'input': 'int', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'length', 'label': 'Duración (min)', 'input': 'int', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'director', 'label': 'Director', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'producer', 'label': 'Productor', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'writer', 'label': 'Guionista', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'composer', 'label': 'Compositor', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'actors', 'label': 'Reparto', 'input': 'textarea', 'section': 'Contenido y producción', 'width': 12, 'rows': 3},
+    {'name': 'languages', 'label': 'Idiomas', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'subtitles', 'label': 'Subtítulos', 'input': 'text', 'section': 'Contenido y producción', 'width': 6},
+    {'name': 'url', 'label': 'URL', 'input': 'text', 'section': 'Metadatos adicionales', 'width': 12},
+    {'name': 'filepath', 'label': 'Ruta del archivo', 'input': 'filepath', 'section': 'Metadatos adicionales', 'width': 12},
+    {'name': 'videoformat', 'label': 'Formato de video', 'input': 'text', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'videobitrate', 'label': 'Bitrate de video', 'input': 'int', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'audioformat', 'label': 'Formato de audio', 'input': 'text', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'audiobitrate', 'label': 'Bitrate de audio', 'input': 'int', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'resolution', 'label': 'Resolución', 'input': 'text', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'framerate', 'label': 'Framerate', 'input': 'text', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'filesize', 'label': 'Tamaño de archivo', 'input': 'text', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'disks', 'label': 'Discos', 'input': 'int', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'nbextras', 'label': 'Extras', 'input': 'int', 'section': 'Detalles técnicos', 'width': 6},
+    {'name': 'description', 'label': 'Descripción', 'input': 'textarea', 'section': 'Notas', 'width': 12, 'rows': 4},
+    {'name': 'comments', 'label': 'Comentarios', 'input': 'textarea', 'section': 'Notas', 'width': 12, 'rows': 3},
+]
+
+
+def _get_movie_form_sections():
+    sections = []
+    for field in MOVIE_FIELD_DEFINITIONS:
+        if field['name'] == 'num':
+            continue
+        if not sections or sections[-1]['title'] != field['section']:
+            sections.append({'title': field['section'], 'fields': []})
+        sections[-1]['fields'].append(field)
+    return sections
+
+
+def _format_form_value(field, value):
+    if value is None:
+        return ''
+    if field['input'] == 'date':
+        if isinstance(value, (date, datetime)):
+            return value.strftime('%Y-%m-%d')
+        return str(value)
+    if field['input'] == 'float':
+        try:
+            return format(value, 'g')
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _build_initial_form_values(movie=None):
+    values = {}
+    for field in MOVIE_FIELD_DEFINITIONS:
+        attr_value = getattr(movie, field['name'], None) if movie else None
+        values[field['name']] = _format_form_value(field, attr_value)
+    if movie:
+        values['num'] = str(movie.num)
+    else:
+        values['num'] = ''
+    return values
+
+
+def _parse_movie_field(field, raw, support_names):
+    input_type = field['input']
+    if input_type == 'textarea':
+        value = (raw or '').strip()
+        return (value or None, None)
+    if input_type == 'text':
+        value = (raw or '').strip()
+        return (value or None, None)
+    if input_type == 'filepath':
+        value = (raw or '').strip()
+        return (value or None, None)
+    if input_type == 'support':
+        value = (raw or '').strip()
+        if not value:
+            return (None, None)
+        if value not in support_names:
+            return (value, f'El tipo de soporte "{value}" no es válido.')
+        return (value, None)
+    if input_type == 'int':
+        raw_value = (raw or '').strip()
+        if raw_value == '':
+            return (None, None)
+        try:
+            return (int(raw_value), None)
+        except ValueError:
+            return (None, f'El campo "{field["label"]}" debe ser un número entero.')
+    if input_type == 'float':
+        raw_value = (raw or '').strip()
+        if raw_value == '':
+            return (None, None)
+        normalized = raw_value.replace(',', '.')
+        try:
+            return (float(normalized), None)
+        except ValueError:
+            return (None, f'El campo "{field["label"]}" debe ser un número decimal.')
+    if input_type == 'date':
+        raw_value = (raw or '').strip()
+        if raw_value == '':
+            return (None, None)
+        try:
+            return (datetime.strptime(raw_value, '%Y-%m-%d').date(), None)
+        except ValueError:
+            return (None, f'El campo "{field["label"]}" debe tener el formato YYYY-MM-DD.')
+    value = (raw or '').strip()
+    return (value or None, None)
+
+
+def _coerce_movie_payload(form_values, support_types):
+    payload = {}
+    errors = []
+    support_names = {s.tipo for s in support_types}
+    for field in MOVIE_FIELD_DEFINITIONS:
+        if field['name'] == 'num':
+            continue
+        raw = form_values.get(field['name'], '')
+        value, error = _parse_movie_field(field, raw, support_names)
+        if error:
+            errors.append(error)
+        payload[field['name']] = value
+    return payload, errors
+
+
+def _format_detail_value(field, value):
+    if value is None:
+        return ''
+    if field['input'] == 'date':
+        if isinstance(value, (date, datetime)):
+            return value.strftime('%Y-%m-%d')
+        return str(value)
+    if field['input'] == 'float':
+        try:
+            formatted = f"{float(value):.2f}"
+            return formatted.rstrip('0').rstrip('.') if '.' in formatted else formatted
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _build_movie_detail_sections(movie):
+    sections = []
+    for field in MOVIE_FIELD_DEFINITIONS:
+        if not sections or sections[-1]['title'] != field['section']:
+            sections.append({'title': field['section'], 'rows': []})
+        value = getattr(movie, field['name'], None)
+        display_value = _format_detail_value(field, value)
+        is_empty = display_value in ('', None)
+        sections[-1]['rows'].append({
+            'field': field,
+            'value': 'Sin datos' if is_empty else display_value,
+            'empty': is_empty
+        })
+    return sections
 
 @bp.route('/')
 def index():
@@ -86,7 +264,8 @@ def import_data():
 def detail(video_id):
     """Muestra los detalles de un video específico"""
     video = Movie.query.get_or_404(video_id)
-    return render_template('videos/detail.html', video=video)
+    detail_sections = _build_movie_detail_sections(video)
+    return render_template('videos/detail.html', video=video, detail_sections=detail_sections)
 
 @bp.route('/api/search')
 def api_search():
@@ -127,58 +306,30 @@ def manage():
 def add_movie():
     """Agregar nuevo registro a movies"""
     support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
+    sections = _get_movie_form_sections()
+
     if request.method == 'POST':
-        form_data = request.form.to_dict()
-        form_data['num'] = (form_data.get('num') or '').strip()
+        next_num = (db.session.query(func.max(Movie.num)).scalar() or 0) + 1
+        form_values = {field['name']: request.form.get(field['name'], '') for field in MOVIE_FIELD_DEFINITIONS}
+        form_values['num'] = str(next_num)
 
-        # Validación de NUM
-        try:
-            num = int(form_data['num'])
-        except Exception:
-            flash('NUM debe ser un número entero válido.', 'error')
-            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
+        payload, errors = _coerce_movie_payload(form_values, support_types)
+        if errors:
+            for message in errors:
+                flash(message, 'error')
+            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_values, field_sections=sections)
 
-        if Movie.query.get(num):
-            flash(f'Ya existe una película con NUM={num}.', 'error')
-            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
-
-        support_names = {s.tipo for s in support_types}
-        mediatype_value = (form_data.get('mediatype') or '').strip()
-        form_data['mediatype'] = mediatype_value
-        mediatype = mediatype_value or None
-        if mediatype and mediatype not in support_names:
-            flash('El tipo de soporte seleccionado no es válido.', 'error')
-            return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
-
-        # Validar año si viene informado
-        year_value = (form_data.get('year') or '').strip()
-        form_data['year'] = year_value
-        if year_value:
-            try:
-                year = int(year_value)
-            except ValueError:
-                flash('El año debe ser un número entero.', 'error')
-                return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data)
-        else:
-            year = None
-
-        movie = Movie(
-            num=num,
-            originaltitle=form_data.get('originaltitle') or None,
-            translatedtitle=form_data.get('translatedtitle') or None,
-            formattedtitle=form_data.get('formattedtitle') or None,
-            year=year,
-            category=form_data.get('category') or None,
-            mediatype=mediatype,
-            description=form_data.get('description') or None,
-            filepath=form_data.get('filepath') or None,
-        )
+        payload['num'] = next_num
+        movie = Movie(**payload)
         db.session.add(movie)
         db.session.commit()
         flash('Película añadida correctamente.', 'success')
         return redirect(url_for('videos.manage'))
 
-    return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=None)
+    next_num = (db.session.query(func.max(Movie.num)).scalar() or 0) + 1
+    form_data = _build_initial_form_values()
+    form_data['num'] = str(next_num)
+    return render_template('videos/movie_form.html', movie=None, support_types=support_types, form_data=form_data, field_sections=sections)
 
 
 @bp.route('/edit/<int:movie_id>', methods=['GET', 'POST'])
@@ -186,40 +337,26 @@ def edit_movie(movie_id):
     """Editar un registro existente"""
     movie = Movie.query.get_or_404(movie_id)
     support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
+    sections = _get_movie_form_sections()
 
     if request.method == 'POST':
-        form_data = request.form.to_dict()
-        support_names = {s.tipo for s in support_types}
-        mediatype_value = (form_data.get('mediatype') or '').strip()
-        form_data['mediatype'] = mediatype_value
-        mediatype = mediatype_value or None
-        if mediatype and mediatype not in support_names:
-            flash('El tipo de soporte seleccionado no es válido.', 'error')
-            return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_data)
+        form_values = {field['name']: request.form.get(field['name'], '') for field in MOVIE_FIELD_DEFINITIONS}
+        form_values['num'] = str(movie.num)
 
-        year_value = (form_data.get('year') or '').strip()
-        form_data['year'] = year_value
-        if year_value:
-            try:
-                movie.year = int(year_value)
-            except ValueError:
-                flash('El año debe ser un número entero.', 'error')
-                return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_data)
-        else:
-            movie.year = None
+        payload, errors = _coerce_movie_payload(form_values, support_types)
+        if errors:
+            for message in errors:
+                flash(message, 'error')
+            return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_values, field_sections=sections)
 
-        movie.originaltitle = form_data.get('originaltitle') or None
-        movie.translatedtitle = form_data.get('translatedtitle') or None
-        movie.formattedtitle = form_data.get('formattedtitle') or None
-        movie.category = form_data.get('category') or None
-        movie.mediatype = mediatype
-        movie.description = form_data.get('description') or None
-        movie.filepath = form_data.get('filepath') or None
+        for key, value in payload.items():
+            setattr(movie, key, value)
         db.session.commit()
         flash('Película actualizada correctamente.', 'success')
         return redirect(url_for('videos.manage'))
 
-    return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=None)
+    form_data = _build_initial_form_values(movie)
+    return render_template('videos/movie_form.html', movie=movie, support_types=support_types, form_data=form_data, field_sections=sections)
 
 
 @bp.route('/delete/<int:movie_id>', methods=['POST'])

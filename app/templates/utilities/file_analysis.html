@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Analizador de archivo - Organizador Multimedia{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <h2 class="mb-3">Analizador de archivo multimedia</h2>
+        <p class="text-muted">Selecciona un archivo desde tu equipo para revisar su clasificación y metadatos básicos.</p>
+    </div>
+    <div class="col-lg-4 text-lg-end">
+        <a class="btn btn-outline-secondary mt-3 mt-lg-0" href="{{ url_for('main.utilities') }}">Volver a utilidades</a>
+    </div>
+</div>
+
+{% if errors %}
+<div class="alert alert-danger">
+    <ul class="mb-0">
+        {% for error in errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if info_messages %}
+<div class="alert alert-info">
+    <ul class="mb-0">
+        {% for message in info_messages %}
+        <li>{{ message }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="mediaFile" class="form-label">Archivo multimedia</label>
+                <input class="form-control" type="file" id="mediaFile" name="media_file" accept="image/*,video/*,audio/*">
+                <div class="form-text">Se analizan archivos de hasta 16 MB, respetando la configuración del servidor.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Analizar archivo</button>
+        </form>
+    </div>
+</div>
+
+{% if analysis %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Resultado del análisis</h5>
+        <dl class="row">
+            <dt class="col-sm-3">Nombre</dt>
+            <dd class="col-sm-9">{{ analysis.filename }}</dd>
+
+            <dt class="col-sm-3">Extensión</dt>
+            <dd class="col-sm-9">{{ analysis.extension }}</dd>
+
+            <dt class="col-sm-3">MIME</dt>
+            <dd class="col-sm-9">{{ analysis.mime }}</dd>
+
+            <dt class="col-sm-3">Tamaño</dt>
+            <dd class="col-sm-9">{{ analysis.size_human }} ({{ analysis.size_bytes }} bytes)</dd>
+
+            <dt class="col-sm-3">Clasificación</dt>
+            <dd class="col-sm-9">
+                {{ analysis.category_label }}
+                {% if not analysis.registered %}
+                <span class="badge bg-warning text-dark ms-2">No registrado</span>
+                {% endif %}
+            </dd>
+
+            <dt class="col-sm-3">Creado</dt>
+            <dd class="col-sm-9">{{ analysis.created_at }}</dd>
+
+            <dt class="col-sm-3">Modificado</dt>
+            <dd class="col-sm-9">{{ analysis.modified_at }}</dd>
+
+            <dt class="col-sm-3">Último acceso</dt>
+            <dd class="col-sm-9">{{ analysis.accessed_at }}</dd>
+        </dl>
+
+        {% if analysis.image_info %}
+        <hr>
+        <h6>Detalles de imagen</h6>
+        <ul class="mb-3">
+            <li>Formato: {{ analysis.image_info.format }}</li>
+            <li>Modo: {{ analysis.image_info.mode }}</li>
+            <li>Dimensiones: {{ analysis.image_info.width }} × {{ analysis.image_info.height }} px</li>
+        </ul>
+        {% endif %}
+
+        {% if analysis.exif %}
+        <hr>
+        <h6>Metadatos EXIF</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <tbody>
+                    {% for key, value in analysis.exif.items() %}
+                    <tr>
+                        <th scope="row" class="w-25">{{ key }}</th>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if analysis.gps %}
+        <hr>
+        <h6>Coordenadas GPS</h6>
+        <ul class="mb-3">
+            {% if analysis.gps.latitude is not none and analysis.gps.longitude is not none %}
+            <li>Latitud: {{ analysis.gps.latitude }}° {{ analysis.gps.latitude_ref }}</li>
+            <li>Longitud: {{ analysis.gps.longitude }}° {{ analysis.gps.longitude_ref }}</li>
+            {% endif %}
+            {% if analysis.gps.altitude is not none %}
+            <li>Altitud: {{ analysis.gps.altitude }} m</li>
+            {% endif %}
+        </ul>
+        {% if analysis.gps.map_url %}
+        <a class="btn btn-outline-secondary btn-sm" target="_blank" href="{{ analysis.gps.map_url }}">Abrir en Google Maps</a>
+        {% endif %}
+        {% if analysis.gps.raw %}
+        <details class="mt-3">
+            <summary>Ver datos GPS originales</summary>
+            <ul class="mt-2">
+                {% for key, value in analysis.gps.raw.items() %}
+                <li><strong>{{ key }}:</strong> {{ value }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+        {% endif %}
+
+        {% if analysis.media_info %}
+        <hr>
+        <h6>Información tecnica (audio/video)</h6>
+        <ul class="mb-3">
+            {% for key, value in analysis.media_info.items() %}
+            <li><strong>{{ key }}:</strong> {{ value }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if analysis.media_tags %}
+        <hr>
+        <h6>Etiquetas embebidas</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <tbody>
+                    {% for key, value in analysis.media_tags.items() %}
+                    <tr>
+                        <th scope="row" class="w-25">{{ key }}</th>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if analysis.suggestions %}
+        <h6>Próximos pasos recomendados</h6>
+        <ul>
+            {% for suggestion in analysis.suggestions %}
+            <li>{{ suggestion }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

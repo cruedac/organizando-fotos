@@ -13,7 +13,7 @@
                 </p>
 
                 <div class="row g-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="border rounded p-3 h-100">
                             <h5>Fotos</h5>
                             <p class="small text-muted">Analiza tus carpetas para conocer cuántos archivos multimedia tienes y su distribución por tipo.</p>
@@ -22,12 +22,21 @@
                             </a>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="border rounded p-3 h-100">
                             <h5>Videos</h5>
                             <p class="small text-muted">Consulta y administra tu catálogo de videos importados desde las cintas legacy.</p>
                             <a class="btn btn-outline-primary" href="{{ url_for('videos.index') }}">
                                 Abrir módulo de Videos
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3 h-100">
+                            <h5>Utilidades</h5>
+                            <p class="small text-muted">Accede a herramientas adicionales como análisis de archivos individuales y exportación de datos.</p>
+                            <a class="btn btn-outline-secondary" href="{{ url_for('main.utilities') }}">
+                                Abrir Utilidades
                             </a>
                         </div>
                     </div>

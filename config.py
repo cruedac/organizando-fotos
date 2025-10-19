@@ -14,7 +14,8 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Configuración de archivos
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+    # Permite analizar vídeos/fotos pesados sin abortar la petición (1 GB)
+    MAX_CONTENT_LENGTH = 1024 * 1024 * 1024
     UPLOAD_FOLDER = os.path.join(BASEDIR, 'uploads')
     
     # Extensiones permitidas (movidas desde create_db.py)
