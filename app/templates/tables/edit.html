@@ -65,6 +65,7 @@
                                     <thead>
                                         <tr>
                                             <th>Nombre</th>
+                                            <th>Descripción</th>
                                             <th>Tipo</th>
                                             <th>Requerido</th>
                                             <th>Clave Primaria</th>
@@ -76,6 +77,7 @@
                                         {% for field in table.fields %}
                                         <tr>
                                             <td>{{ field.name }}</td>
+                                            <td>{{ field.description or '—' }}</td>
                                             <td>{{ field.field_type }}</td>
                                             <td>
                                                 {% if field.is_required %}

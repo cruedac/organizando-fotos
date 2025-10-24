@@ -59,6 +59,8 @@
                 
                 <div id="results" class="mt-4" style="display: none;">
                     <h6 class="border-bottom pb-2 mb-3">Resultados del Análisis</h6>
+                    <div id="scanFeedback" class="alert d-none" role="alert"></div>
+                    <p class="text-muted" id="foldersWithFiles" style="display: none;"></p>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="card">
@@ -79,6 +81,18 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card mt-4" id="saveScanCard" style="display: none;">
+                        <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between">
+                            <div class="mb-3 mb-md-0">
+                                <h6 class="card-subtitle text-muted">Guardar resumen en la tabla photos_scan</h6>
+                                <p class="mb-0 small" id="saveScanSummary"></p>
+                            </div>
+                            <div class="text-md-end">
+                                <button class="btn btn-outline-secondary me-2" id="dismissSavePrompt">Descartar</button>
+                                <button class="btn btn-primary" id="saveScanButton">Guardar</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -91,6 +105,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const folderExplorerModal = new bootstrap.Modal(document.getElementById('folderExplorerModal'));
     let currentPath = '';
+    let lastScanState = null;
     
     // Función para actualizar la lista de carpetas
     async function updateFolderList(path) {
@@ -205,7 +220,17 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             if (response.ok) {
+                lastScanState = {
+                    folderPath,
+                    scanSubdirs,
+                    totals: data.totals,
+                    by_extension: data.by_extension,
+                    summary: data.summary,
+                    directorySummaries: data.directory_summaries || [],
+                    directoriesCount: typeof data.directories_count === 'number' ? data.directories_count : (data.directory_summaries || []).length
+                };
                 displayResults(data);
+                showSavePrompt(lastScanState);
             } else {
                 alert('Error: ' + data.error);
             }
@@ -213,12 +238,67 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Error al analizar la carpeta: ' + error);
         }
     });
+
+    document.getElementById('saveScanButton').addEventListener('click', async () => {
+        if (!lastScanState) {
+            return;
+        }
+        if (!confirm('¿Deseas guardar este resultado de escaneo en la tabla photos_scan?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/scan/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: lastScanState.folderPath,
+                    scan_subdirs: lastScanState.scanSubdirs,
+                    totals: lastScanState.totals,
+                    by_extension: lastScanState.by_extension,
+                    summary: lastScanState.summary,
+                    directories: lastScanState.directorySummaries,
+                    directories_count: lastScanState.directoriesCount,
+                    total_size: lastScanState.summary ? lastScanState.summary.total_size : null
+                })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                const stored = typeof result.stored === 'number' ? result.stored : 1;
+                const message = stored === 1
+                    ? 'Se guardó 1 registro de carpeta.'
+                    : `Se guardaron ${stored} registros de carpetas.`;
+                const summaryNote = result.summary_id ? ' El resumen general también fue almacenado.' : '';
+                showFeedback(message + summaryNote, 'alert-success');
+                hideSavePrompt();
+            } else {
+                const message = result.error || 'No se pudo guardar el resumen.';
+                showFeedback(message, 'alert-danger');
+            }
+        } catch (error) {
+            showFeedback('Error al guardar el resumen: ' + error, 'alert-danger');
+        }
+    });
+
+    document.getElementById('dismissSavePrompt').addEventListener('click', () => {
+        hideSavePrompt();
+    });
 });
 
 function displayResults(data) {
     const results = document.getElementById('results');
     const totalsList = document.getElementById('totalsList');
     const extensionList = document.getElementById('extensionList');
+    const feedback = document.getElementById('scanFeedback');
+    const foldersWithFiles = document.getElementById('foldersWithFiles');
+
+    if (feedback) {
+        feedback.classList.add('d-none');
+        feedback.textContent = '';
+    }
     
     // Mostrar totales con iconos
     const typeIcons = {
@@ -228,10 +308,11 @@ function displayResults(data) {
         'other': '📄'
     };
     
-    totalsList.innerHTML = Object.entries(data.totals)
+    const totals = data.totals || {};
+    totalsList.innerHTML = Object.entries(totals)
         .map(([type, count]) => 
             `<li class="mb-2">
-                <span class="fs-5">${typeIcons[type]}</span>
+                <span class="fs-5">${typeIcons[type] || '📄'}</span>
                 <strong class="ms-2">${type}:</strong> 
                 <span class="badge bg-primary ms-2">${count}</span>
             </li>`
@@ -239,7 +320,8 @@ function displayResults(data) {
         .join('');
     
     // Mostrar desglose por extensión
-    extensionList.innerHTML = Object.entries(data.by_extension)
+    const byExtension = data.by_extension || {};
+    extensionList.innerHTML = Object.entries(byExtension)
         .sort(([,a], [,b]) => b - a) // Ordenar por cantidad
         .map(([ext, count]) => 
             `<li class="mb-2">
@@ -249,7 +331,111 @@ function displayResults(data) {
         )
         .join('');
     
+    if (foldersWithFiles) {
+        const directorySummaries = data.directory_summaries || [];
+        const count = Number.isFinite(data.directories_count) ? Number(data.directories_count) : directorySummaries.length;
+        if (count) {
+            const label = count === 1
+                ? '1 carpeta contiene archivos analizados.'
+                : `${count} carpetas contienen archivos analizados.`;
+            const monthSet = new Map();
+            directorySummaries.forEach(item => {
+                let monthNumber = null;
+                if (item.month_number !== null && item.month_number !== undefined && item.month_number !== '') {
+                    const parsed = Number(item.month_number);
+                    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 12) {
+                        monthNumber = parsed;
+                    }
+                }
+                const monthText = item.month_text || null;
+                if (monthNumber || monthText) {
+                    const key = monthNumber || monthText;
+                    const canonicalText = monthNumber
+                        ? `${monthNumber.toString().padStart(2, '0')}${monthText ? ` (${monthText})` : ''}`
+                        : monthText;
+                    if (key && !monthSet.has(key)) {
+                        monthSet.set(key, canonicalText);
+                    }
+                }
+            });
+            const monthsSummary = monthSet.size
+                ? ` Meses detectados: ${Array.from(monthSet.values()).join(', ')}.`
+                : '';
+            foldersWithFiles.textContent = label + monthsSummary;
+            foldersWithFiles.style.display = 'block';
+        } else {
+            foldersWithFiles.style.display = 'none';
+            foldersWithFiles.textContent = '';
+        }
+    }
+
+    const totalSizeInfo = data.total_size_human || (data.summary && data.summary.total_size_human);
+    if (totalSizeInfo) {
+        showFeedback(`Tamaño total procesado: ${totalSizeInfo}`, 'alert-info');
+    }
+
     results.style.display = 'block';
+}
+
+function showSavePrompt(state) {
+    const card = document.getElementById('saveScanCard');
+    const summaryEl = document.getElementById('saveScanSummary');
+
+    if (!state || !state.summary) {
+        hideSavePrompt();
+        return;
+    }
+
+    const summary = state.summary;
+    const directorySummaries = state.directorySummaries || [];
+    const directoriesCount = Number.isFinite(state.directoriesCount) ? Number(state.directoriesCount) : directorySummaries.length;
+    const hasFiles = Boolean(summary.media_types) || summary.num_images > 0 || summary.num_videos > 0;
+
+    if (!directoriesCount && !hasFiles) {
+        hideSavePrompt();
+        return;
+    }
+
+    const previewSource = directoriesCount ? directorySummaries : [summary];
+    const preview = previewSource.slice(0, 3).map(item => item.end_name || item.path).filter(Boolean);
+
+    const parts = [
+        `Ruta analizada: ${summary.path}`,
+        `Carpetas con archivos: ${directoriesCount || 1}`,
+        `Ejemplos: ${preview.length ? preview.join(', ') : 'N/D'}`,
+        `Imágenes totales: ${summary.num_images}`,
+        `Videos totales: ${summary.num_videos}`
+    ];
+    if (summary.total_size_human) {
+        parts.push(`Tamaño total: ${summary.total_size_human}`);
+    }
+    if (summary.year) {
+        parts.push(`Año detectado: ${summary.year}`);
+    }
+    if (summary.month_number || summary.month_text) {
+        const monthNumber = summary.month_number ? Number(summary.month_number) : null;
+        const formattedNumber = monthNumber ? monthNumber.toString().padStart(2, '0') : 'N/D';
+        const monthLabel = summary.month_text ? `${summary.month_text}` : '';
+        if (monthNumber) {
+            parts.push(`Mes detectado: ${formattedNumber}${monthLabel ? ` (${monthLabel})` : ''}`);
+        } else if (monthLabel) {
+            parts.push(`Mes detectado: ${monthLabel}`);
+        }
+    }
+    summaryEl.textContent = parts.join(' • ');
+    card.style.display = 'block';
+}
+
+function hideSavePrompt() {
+    const card = document.getElementById('saveScanCard');
+    card.style.display = 'none';
+}
+
+function showFeedback(message, type) {
+    const feedback = document.getElementById('scanFeedback');
+    feedback.className = `alert ${type}`;
+    feedback.textContent = message;
+    feedback.classList.remove('d-none');
 }
 </script>
 {% endblock %}

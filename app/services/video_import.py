@@ -1,7 +1,11 @@
-import os
-from app import db
 import json
+import logging
+import os
 from datetime import datetime
+
+from app import db
+
+logger = logging.getLogger(__name__)
 
 def import_movies_from_txt(app=None):
     """Importa INSERTs desde imports/datos.txt hacia la base de datos.
@@ -29,7 +33,7 @@ def import_movies_from_txt(app=None):
                     db.session.execute(line)
                     imported += 1
                 except Exception as e:
-                    print(f"Error importing line: {e}")
+                    logger.exception("Error importing line", exc_info=e)
         db.session.commit()
 
     # Ejecutar con el contexto adecuado
@@ -44,10 +48,10 @@ def import_movies_from_txt(app=None):
                 _do_import()
         except RuntimeError:
             # No hay contexto disponible
-            print("No hay contexto de aplicación disponible para importar datos.")
+            logger.warning("No hay contexto de aplicación disponible para importar datos.")
             return 0
 
-    print(f"Importación de películas finalizada. Total importados: {imported}")
+    logger.info("Importación de películas finalizada. Total importados: %s", imported)
     return imported
 
 
@@ -64,14 +68,14 @@ def import_sql_file(sql_path=None, app=None):
         sql_path = os.path.join(os.getcwd(), 'imports', 'Cintas.sql')
 
     if not os.path.exists(sql_path):
-        print(f"Archivo SQL no encontrado: {sql_path}")
+        logger.warning("Archivo SQL no encontrado: %s", sql_path)
         return 0
 
     # Controlar ejecución condicional por variable de entorno
     import os as _os
     env_flag = _os.getenv('IMPORT_LEGACY_SQL', '')
     if str(env_flag).lower() not in ['', '1', 'true', 'yes']:
-        print('IMPORT_LEGACY_SQL no establecido. Saltando ejecución de SQL legacy.')
+        logger.info('IMPORT_LEGACY_SQL no establecido. Saltando ejecución de SQL legacy.')
         return 0
 
     # Ejecutar dentro del contexto de la aplicación si se pasa
@@ -117,7 +121,7 @@ def import_sql_file(sql_path=None, app=None):
                     pass
                 err = str(ex_exec)
                 report['errors'].append(err)
-                print(f"Error ejecutando script SQL: {err}")
+                logger.error("Error ejecutando script SQL: %s", err)
                 # re-raise to upper handler
                 raise
         except Exception as e:
@@ -127,7 +131,7 @@ def import_sql_file(sql_path=None, app=None):
                 pass
             err = str(e)
             report.setdefault('errors', []).append(err)
-            print(f"Error ejecutando SQL desde {sql_path}: {err}")
+            logger.error("Error ejecutando SQL desde %s: %s", sql_path, err)
         finally:
             try:
                 cursor.close()
@@ -147,9 +151,9 @@ def import_sql_file(sql_path=None, app=None):
             report_path = os.path.join(reports_dir, report_name)
             with open(report_path, 'w', encoding='utf-8') as rf:
                 json.dump(report, rf, ensure_ascii=False, indent=2)
-            print(f"Informe de importación guardado en: {report_path}")
+            logger.info("Informe de importación guardado en: %s", report_path)
         except Exception as e_rep:
-            print(f"Error escribiendo informe de importación: {e_rep}")
+            logger.error("Error escribiendo informe de importación: %s", e_rep)
 
         return imported_statements
 
@@ -162,8 +166,8 @@ def import_sql_file(sql_path=None, app=None):
             with current_app.app_context():
                 count = _exec_sql()
         except RuntimeError:
-            print('No hay contexto de aplicación disponible para ejecutar SQL.')
+            logger.warning('No hay contexto de aplicación disponible para ejecutar SQL.')
             return 0
 
-    print(f"Ejecución de SQL finalizada. INSERTs aproximados ejecutados: {count}")
+    logger.info("Ejecución de SQL finalizada. INSERTs aproximados ejecutados: %s", count)
     return count

@@ -2,7 +2,7 @@
 Paquete de modelos de la aplicación
 """
 
-from .database import FileType, DynamicTable, TableField, TipoSoporte
+from .database import FileType, DynamicTable, TableField, TipoSoporte, PhotoScan, PhotoScanSummary
 from .movie import Movie
 
 __all__ = [
@@ -10,5 +10,7 @@ __all__ = [
     'DynamicTable',
     'TableField',
     'TipoSoporte',
-    'Movie'
+    'Movie',
+    'PhotoScan',
+    'PhotoScanSummary'
 ]

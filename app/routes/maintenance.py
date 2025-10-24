@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file
 from sqlalchemy import func, text
 from app.models.database import db, FileType, TipoSoporte, DynamicTable
+from app.services.media_metadata import format_size
 from app.models.movie import Movie
 from sqlalchemy import inspect
 from pathlib import Path
@@ -13,16 +14,6 @@ import io
 
 bp = Blueprint('maintenance', __name__, url_prefix='/maintenance')
 
-
-def _format_size(num_bytes: int) -> str:
-    """Devuelve un tamaño legible (KB, MB, GB)."""
-    step = 1024.0
-    units = ['bytes', 'KB', 'MB', 'GB', 'TB']
-    size = float(num_bytes)
-    for unit in units:
-        if size < step or unit == units[-1]:
-            return f"{size:.2f} {unit}" if unit != 'bytes' else f"{int(size)} bytes"
-        size /= step
 
 def _get_database_info():
     """Construye un resumen del estado actual de la base de datos SQLite."""
@@ -52,7 +43,7 @@ def _get_database_info():
         'db_name': db_name,
         'db_path': str(db_path),
     'db_size': size_bytes,
-    'db_size_human': _format_size(size_bytes),
+        'db_size_human': format_size(size_bytes),
         'table_count': len(tables),
         'tables': table_info,
         'backup_suggestion': str(db_path.with_suffix('.bk'))

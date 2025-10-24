@@ -1,17 +1,24 @@
 import mimetypes
 import os
+import re
 import string
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, Tuple
 
 from flask import Blueprint, render_template, request, jsonify, current_app
-from PIL import Image
-from PIL.ExifTags import TAGS, GPSTAGS
 from werkzeug.utils import secure_filename
 
-from app.models.database import FileType, db
-from app.services.file_scanner import scan_for_media_recursive
+from app.models.database import (
+    FileType,
+    PhotoScan,
+    PhotoScanSummary,
+    db,
+    ensure_photos_scan_summary_table,
+)
+from app.services.file_scanner import NO_EXTENSION, scan_for_media_recursive
+from app.services.media_metadata import format_size, read_image_metadata, read_media_tags
 
 bp = Blueprint('main', __name__)
 
@@ -28,156 +35,6 @@ def photos():
 @bp.route('/utilidades')
 def utilities():
     return render_template('utilities/index.html')
-
-
-def _format_size(num_bytes: int) -> str:
-    units = ['bytes', 'KB', 'MB', 'GB', 'TB']
-    size = float(num_bytes)
-    for unit in units:
-        if size < 1024 or unit == units[-1]:
-            return f"{size:.2f} {unit}" if unit != 'bytes' else f"{int(size)} {unit}"
-        size /= 1024
-    return f"{size:.2f} TB"
-
-
-def _ratio_to_float(value):
-    try:
-        return float(value[0]) / float(value[1]) if value[1] else None
-    except Exception:
-        return None
-
-
-def _convert_to_degrees(value):
-    if not value or len(value) < 3:
-        return None
-    degrees = _ratio_to_float(value[0])
-    minutes = _ratio_to_float(value[1])
-    seconds = _ratio_to_float(value[2])
-    if None in (degrees, minutes, seconds):
-        return None
-    return degrees + (minutes / 60.0) + (seconds / 3600.0)
-
-
-def _sanitize_exif_value(value):
-    if isinstance(value, bytes):
-        try:
-            return value.decode('utf-8', errors='replace')
-        except Exception:
-            return value.hex()
-    if isinstance(value, (list, tuple)):
-        return ', '.join(str(item) for item in value)
-    return value
-
-
-def _extract_image_metadata(image_path: Path):
-    exif_clean = {}
-    gps_payload = None
-
-    with Image.open(image_path) as img:
-        raw = getattr(img, '_getexif', lambda: None)()
-
-    if not raw:
-        return {}, None
-
-    gps_raw = {}
-    for tag, value in raw.items():
-        tag_name = TAGS.get(tag, tag)
-        if tag_name == 'GPSInfo':
-            for key, gps_value in value.items():
-                gps_tag = GPSTAGS.get(key, key)
-                gps_raw[gps_tag] = gps_value
-        else:
-            exif_clean[tag_name] = _sanitize_exif_value(value)
-
-    if gps_raw:
-        lat = gps_raw.get('GPSLatitude')
-        lat_ref = gps_raw.get('GPSLatitudeRef')
-        lon = gps_raw.get('GPSLongitude')
-        lon_ref = gps_raw.get('GPSLongitudeRef')
-        alt = gps_raw.get('GPSAltitude')
-        alt_ref = gps_raw.get('GPSAltitudeRef')
-
-        lat_deg = _convert_to_degrees(lat) if lat else None
-        lon_deg = _convert_to_degrees(lon) if lon else None
-
-        if lat_deg is not None and lat_ref in ('S', 'N'):
-            lat_deg = lat_deg if lat_ref == 'N' else -lat_deg
-        if lon_deg is not None and lon_ref in ('W', 'E'):
-            lon_deg = lon_deg if lon_ref == 'E' else -lon_deg
-
-        gps_payload = {
-            'latitude': lat_deg,
-            'latitude_ref': lat_ref,
-            'longitude': lon_deg,
-            'longitude_ref': lon_ref,
-            'altitude': _ratio_to_float(alt) if alt else None,
-            'altitude_ref': alt_ref,
-            'raw': {key: _sanitize_exif_value(val) for key, val in gps_raw.items()}
-        }
-
-        if lat_deg is not None and lon_deg is not None:
-            gps_payload['map_url'] = f"https://www.google.com/maps?q={lat_deg},{lon_deg}"
-
-    ordered_exif = dict(sorted(exif_clean.items()))
-    return ordered_exif, gps_payload
-
-
-def _format_duration(seconds):
-    if seconds is None:
-        return None
-    try:
-        total_seconds = int(round(float(seconds)))
-    except Exception:
-        return str(seconds)
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours}:{minutes:02d}:{secs:02d}"
-    return f"{minutes}:{secs:02d}"
-
-
-def _extract_mutagen_metadata(media_path: Path):
-    try:
-        import mutagen
-    except ImportError:
-        return None, None, 'Instala la librería "mutagen" para obtener metadatos embebidos de audio y video.'
-
-    try:
-        media = mutagen.File(str(media_path), easy=True)
-    except Exception as exc:
-        return None, None, f'No se pudieron leer metadatos embebidos: {exc}'
-
-    if media is None:
-        return None, None, 'El archivo no contiene etiquetas legibles por mutagen.'
-
-    tags = {}
-    for key, value in media.items():
-        if isinstance(value, (list, tuple)):
-            tags[key] = ', '.join(str(item) for item in value if item is not None)
-        else:
-            tags[key] = str(value)
-
-    details = {}
-    info = getattr(media, 'info', None)
-    if info is not None:
-        duration = getattr(info, 'length', None)
-        bitrate = getattr(info, 'bitrate', None)
-        sample_rate = getattr(info, 'sample_rate', None)
-        channels = getattr(info, 'channels', None)
-
-        if duration is not None:
-            formatted = _format_duration(duration)
-            if formatted:
-                details['Duración'] = formatted
-        if bitrate:
-            human_bitrate = f"{int(bitrate / 1000)} kbps" if bitrate > 1000 else f"{bitrate} bps"
-            details['Bitrate'] = human_bitrate
-        if sample_rate:
-            details['Frecuencia de muestreo'] = f"{int(sample_rate)} Hz"
-        if channels:
-            details['Canales'] = str(channels)
-
-    return tags or None, details or None, None
 
 
 def _analysis_suggestions(category: str, registered: bool) -> list:
@@ -205,6 +62,171 @@ def _analysis_suggestions(category: str, registered: bool) -> list:
     return result
 
 
+_YEAR_PATTERN = re.compile(r'(19|20)\d{2}')
+_MONTH_VARIANTS = {
+    1: ['enero', 'ene', 'january', 'jan'],
+    2: ['febrero', 'feb', 'february'],
+    3: ['marzo', 'mar', 'march'],
+    4: ['abril', 'abr', 'april', 'apr'],
+    5: ['mayo', 'may'],
+    6: ['junio', 'jun', 'june'],
+    7: ['julio', 'jul', 'july'],
+    8: ['agosto', 'ago', 'august', 'aug'],
+    9: ['septiembre', 'setiembre', 'sep', 'sept', 'september'],
+    10: ['octubre', 'oct', 'october'],
+    11: ['noviembre', 'nov', 'november'],
+    12: ['diciembre', 'dic', 'december', 'dec'],
+}
+_MONTH_CANONICAL = {num: variants[0].capitalize() for num, variants in _MONTH_VARIANTS.items()}
+_MONTH_LOOKUP = {alias: num for num, variants in _MONTH_VARIANTS.items() for alias in variants}
+for number in range(1, 13):
+    _MONTH_LOOKUP[str(number)] = number
+    _MONTH_LOOKUP[f'{number:02d}'] = number
+
+
+def _parse_year_from_name(name: str) -> Optional[int]:
+    if not name:
+        return None
+    match = _YEAR_PATTERN.search(name)
+    if match:
+        value = int(match.group())
+        if 1900 <= value <= 2100:
+            return value
+    return None
+
+
+def _parse_month_from_name(name: str) -> Tuple[Optional[int], Optional[str]]:
+    if not name:
+        return None, None
+
+    month_number: Optional[int] = None
+    month_text: Optional[str] = None
+    cleaned = name.strip()
+    if not cleaned:
+        return None, None
+
+    prefix_match = re.match(r'(?P<num>\d{1,2})\D*(?P<rest>.*)$', cleaned)
+    if prefix_match:
+        try:
+            candidate = int(prefix_match.group('num'))
+            if 1 <= candidate <= 12:
+                month_number = candidate
+        except ValueError:
+            month_number = None
+        remainder = prefix_match.group('rest').strip(" -_.")
+        if remainder and any(char.isalpha() for char in remainder):
+            month_text = remainder
+
+    tokens = re.split(r'[\s\-_/.,]+', cleaned.lower())
+    for token in tokens:
+        if token in _MONTH_LOOKUP:
+            resolved = _MONTH_LOOKUP[token]
+            if month_number is None:
+                month_number = resolved
+            if not month_text:
+                month_text = _MONTH_CANONICAL.get(resolved)
+            break
+
+    if month_number and not month_text:
+        month_text = _MONTH_CANONICAL.get(month_number)
+
+    if month_text:
+        month_text = ' '.join(part.capitalize() for part in month_text.strip().split())
+
+    return month_number, month_text
+
+
+def _extract_year_and_month(path_obj: Path) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+    candidates = []
+    current = path_obj
+    visited = 0
+    while current and current.parent != current and visited < 5:
+        candidates.append(current.name)
+        current = current.parent
+        visited += 1
+    if current and current.parent == current:
+        candidates.append(current.name)
+
+    year = None
+    for candidate in candidates:
+        year_candidate = _parse_year_from_name(candidate)
+        if year_candidate is not None:
+            year = year_candidate
+            break
+
+    month_number = None
+    month_text = None
+    for candidate in candidates:
+        candidate_month, candidate_text = _parse_month_from_name(candidate)
+        if candidate_month is None and candidate_text is None:
+            continue
+
+        if candidate_month is not None:
+            month_number = candidate_month
+        if candidate_text:
+            month_text = candidate_text
+
+        if month_number is not None and not month_text:
+            month_text = _MONTH_CANONICAL.get(month_number)
+
+        if month_number is not None and month_text:
+            break
+
+    return year, month_number, month_text
+
+
+def _build_scan_summary(
+    folder_path: str,
+    totals: dict,
+    by_extension: dict,
+    timestamp: Optional[datetime] = None,
+    total_size: Optional[int] = None
+) -> dict:
+    """Prepara un resumen de escaneo para una carpeta concreta."""
+    path_obj = Path(folder_path)
+    try:
+        path_obj = path_obj.resolve()
+    except Exception:
+        # Si no se puede normalizar completamente la ruta trabajamos con la original
+        path_obj = Path(folder_path)
+
+    full_path = str(path_obj)
+    parent_obj = path_obj.parent if path_obj.parent != path_obj else None
+    parent_path = str(parent_obj) if parent_obj else None
+    end_name = path_obj.name or full_path
+
+    cleaned_extensions = [ext for ext, count in (by_extension or {}).items() if ext and ext != NO_EXTENSION and count > 0]
+    cleaned_extensions.sort()
+    media_types = ','.join(cleaned_extensions)
+
+    completed_at = timestamp or datetime.utcnow()
+
+    year, month_number, month_text = _extract_year_and_month(path_obj)
+
+    size_value = 0
+    if total_size is not None:
+        try:
+            size_value = max(int(total_size), 0)
+        except (TypeError, ValueError):
+            size_value = 0
+    size_human = format_size(size_value) if size_value else '0 bytes'
+
+    return {
+        'path': full_path,
+        'parent_path': parent_path,
+        'end_name': end_name,
+        'num_images': int(totals.get('image', 0)) if totals else 0,
+        'num_videos': int(totals.get('video', 0)) if totals else 0,
+        'media_types': media_types,
+        'last_scan': completed_at.isoformat(timespec='seconds'),
+        'year': year,
+        'month_number': month_number,
+        'month_text': month_text,
+        'total_size': size_value,
+        'total_size_human': size_human
+    }
+
+
 @bp.route('/utilidades/analizador', methods=['GET', 'POST'])
 def analyze_media_file():
     analysis = None
@@ -221,8 +243,9 @@ def analyze_media_file():
             try:
                 max_size = current_app.config.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
                 upload_stream = uploaded.stream
-                chunk_size = 1 * 1024 * 1024  # 1 MB
+                chunk_size = 1 * 1024 * 1024
                 bytes_written = 0
+                too_large = False
 
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
                     temp_path = Path(tmp.name)
@@ -233,8 +256,12 @@ def analyze_media_file():
                         bytes_written += len(chunk)
                         if max_size and bytes_written > max_size:
                             errors.append('El archivo excede el tamaño máximo permitido por la configuración del servidor.')
-                            raise ValueError('File too large')
+                            too_large = True
+                            break
                         tmp.write(chunk)
+
+                if too_large:
+                    raise RuntimeError('FILE_TOO_LARGE')
 
                 stat = temp_path.stat()
                 extension = Path(filename).suffix.lower()
@@ -255,19 +282,9 @@ def analyze_media_file():
                 gps_data = None
                 if category == 'image':
                     try:
-                        with Image.open(temp_path) as img:
-                            image_info = {
-                                'format': img.format,
-                                'mode': img.mode,
-                                'width': img.width,
-                                'height': img.height
-                            }
+                        image_info, exif_data, gps_data = read_image_metadata(temp_path)
                     except Exception as exc:
                         errors.append(f'No se pudieron leer los metadatos de imagen: {exc}')
-                    try:
-                        exif_data, gps_data = _extract_image_metadata(temp_path)
-                    except Exception as exc:
-                        errors.append(f'No se pudieron leer los datos EXIF: {exc}')
 
                 media_tags = None
                 media_details = None
@@ -278,7 +295,7 @@ def analyze_media_file():
                     should_extract_media = True
 
                 if should_extract_media:
-                    tags, details, note = _extract_mutagen_metadata(temp_path)
+                    tags, details, note = read_media_tags(temp_path)
                     media_tags = tags
                     media_details = details
                     if note:
@@ -288,7 +305,7 @@ def analyze_media_file():
                     'filename': filename,
                     'extension': extension or '(sin extension)',
                     'size_bytes': stat.st_size,
-                    'size_human': _format_size(stat.st_size),
+                    'size_human': format_size(stat.st_size),
                     'category': category,
                     'category_label': {'image': 'Imagen', 'video': 'Video', 'audio': 'Audio'}.get(category, 'Otro'),
                     'registered': bool(entry),
@@ -305,7 +322,8 @@ def analyze_media_file():
                 }
 
             except Exception as exc:
-                errors.append(f'No se pudo analizar el archivo seleccionado: {exc}')
+                if str(exc) != 'FILE_TOO_LARGE':
+                    errors.append(f'No se pudo analizar el archivo seleccionado: {exc}')
             finally:
                 if temp_path and temp_path.exists():
                     try:
@@ -422,8 +440,231 @@ def scan_directory():
             audio_extensions=extensions['audio'],
             scan_subdirs=scan_subdirs
         )
+        scan_timestamp = datetime.utcnow()
+        summary = _build_scan_summary(
+            folder_path,
+            result.get('totals'),
+            result.get('by_extension'),
+            timestamp=scan_timestamp,
+            total_size=result.get('total_size')
+        )
+        directory_summaries = []
+        for entry in result.get('directories', []) or []:
+            directory_summaries.append(
+                _build_scan_summary(
+                    entry.get('path', ''),
+                    entry.get('totals') or {},
+                    entry.get('by_extension') or {},
+                    timestamp=scan_timestamp,
+                    total_size=entry.get('total_size')
+                )
+            )
+        result['summary'] = summary
+        result['directory_summaries'] = directory_summaries
+        result['directories_count'] = len(directory_summaries)
+        result['total_size'] = summary.get('total_size')
+        result['total_size_human'] = summary.get('total_size_human')
         return jsonify(result)
     except Exception as e:
         return jsonify({
             'error': f'Error al escanear el directorio: {str(e)}'
         }), 500
+
+
+@bp.route('/scan/save', methods=['POST'])
+def save_scan_summary():
+    """Guarda en la base de datos el resumen de un escaneo realizado."""
+    payload = request.get_json() or {}
+
+    folder_path = payload.get('folder_path')
+    totals = payload.get('totals') or {}
+    by_extension = payload.get('by_extension') or {}
+    directories = payload.get('directories') or []
+    directories_count_value = payload.get('directories_count')
+    summary_payload = payload.get('summary') if isinstance(payload.get('summary'), dict) else None
+
+    if not folder_path:
+        return jsonify({'error': 'Se requiere la ruta analizada para guardar el resumen.'}), 400
+
+    try:
+        ensure_photos_scan_summary_table(current_app)
+        records_to_persist = []
+        saved_at = datetime.utcnow()
+
+        def _safe_int(value, default=0):
+            try:
+                parsed = int(value)
+                return parsed if parsed >= 0 else default
+            except (TypeError, ValueError):
+                return default
+
+        def _safe_optional_int(value):
+            try:
+                parsed = int(value)
+                return parsed if parsed >= 0 else None
+            except (TypeError, ValueError):
+                return None
+
+        summary_total_size = 0
+        payload_total_size = payload.get('total_size')
+        if payload_total_size is not None:
+            summary_total_size = _safe_int(payload_total_size, 0)
+        if summary_total_size <= 0 and summary_payload and summary_payload.get('total_size') is not None:
+            summary_total_size = _safe_int(summary_payload.get('total_size'), 0)
+        if summary_total_size <= 0:
+            summary_total_size = sum(_safe_int(entry.get('total_size'), 0) for entry in directories)
+        if summary_total_size <= 0:
+            summary_total_size = _safe_int(totals.get('total_size'), 0)
+
+        summaries = directories
+        if not summaries:
+            total_values = list((totals or {}).values())
+            extension_values = list((by_extension or {}).values())
+            if any(value > 0 for value in total_values + extension_values):
+                summaries = [_build_scan_summary(
+                    folder_path,
+                    totals,
+                    by_extension,
+                    timestamp=saved_at,
+                    total_size=summary_total_size
+                )]
+            else:
+                return jsonify({'error': 'No se encontraron carpetas con archivos para guardar.'}), 400
+
+        canonical_summary = _build_scan_summary(
+            folder_path,
+            totals,
+            by_extension,
+            timestamp=saved_at,
+            total_size=summary_total_size
+        )
+        summary_details = canonical_summary.copy()
+        if summary_payload:
+            summary_details.update({k: v for k, v in summary_payload.items() if v is not None})
+        if not summary_details.get('path'):
+            summary_details['path'] = canonical_summary['path']
+
+        directories_count = _safe_int(directories_count_value, len(directories))
+        if directories_count <= 0 and summaries:
+            directories_count = len(summaries)
+
+        summary_num_images = _safe_int(summary_details.get('num_images'), totals.get('image', 0))
+        summary_num_videos = _safe_int(summary_details.get('num_videos'), totals.get('video', 0))
+        summary_year = _safe_optional_int(summary_details.get('year'))
+        summary_month_number = _safe_optional_int(summary_details.get('month_number'))
+        summary_total_size = _safe_int(summary_details.get('total_size'), summary_total_size)
+
+        summary_month_text = summary_details.get('month_text')
+        if isinstance(summary_month_text, str):
+            summary_month_text = summary_month_text.strip() or None
+        else:
+            summary_month_text = None
+
+        if summary_month_text:
+            parsed_month, parsed_text = _parse_month_from_name(summary_month_text)
+            if summary_month_number is None and parsed_month is not None:
+                summary_month_number = parsed_month
+            if parsed_text:
+                summary_month_text = parsed_text
+            elif summary_month_number is not None:
+                summary_month_text = _MONTH_CANONICAL.get(summary_month_number, summary_month_text.title())
+            else:
+                summary_month_text = summary_month_text.title()
+        elif summary_month_number is not None:
+            summary_month_text = _MONTH_CANONICAL.get(summary_month_number)
+
+        summary_record = PhotoScanSummary(
+            path=summary_details.get('path'),
+            directories_count=directories_count,
+            num_images=summary_num_images,
+            num_videos=summary_num_videos,
+            year=summary_year,
+            month_number=summary_month_number,
+            month_text=summary_month_text,
+            total_size=summary_total_size,
+            created_at=saved_at
+        )
+
+        for summary in summaries:
+            path_value = summary.get('path')
+            if not path_value:
+                continue
+
+            num_images = summary.get('num_images', 0)
+            try:
+                num_images = int(num_images)
+            except (TypeError, ValueError):
+                num_images = 0
+
+            num_videos = summary.get('num_videos', 0)
+            try:
+                num_videos = int(num_videos)
+            except (TypeError, ValueError):
+                num_videos = 0
+
+            year_value = summary.get('year')
+            try:
+                year_value = int(year_value) if year_value is not None else None
+            except (TypeError, ValueError):
+                year_value = None
+
+            month_value = summary.get('month_number')
+            try:
+                month_value = int(month_value) if month_value is not None else None
+            except (TypeError, ValueError):
+                month_value = None
+
+            month_label = summary.get('month_text')
+            if isinstance(month_label, str):
+                month_label = month_label.strip() or None
+            else:
+                month_label = None
+
+            if month_label:
+                parsed_month_value, parsed_month_text = _parse_month_from_name(month_label)
+                if month_value is None and parsed_month_value is not None:
+                    month_value = parsed_month_value
+                if parsed_month_text:
+                    month_label = parsed_month_text
+                elif month_value is not None:
+                    month_label = _MONTH_CANONICAL.get(month_value, month_label.title())
+                else:
+                    month_label = month_label.title()
+            elif month_value is not None:
+                month_label = _MONTH_CANONICAL.get(month_value)
+
+            folder_size = _safe_int(summary.get('total_size'), 0)
+
+            record = PhotoScan(
+                path=summary.get('path'),
+                parent_path=summary.get('parent_path'),
+                end_name=summary.get('end_name'),
+                num_images=num_images,
+                num_videos=num_videos,
+                media_types=(summary.get('media_types') or None),
+                last_scan=saved_at,
+                created_at=saved_at,
+                year=year_value,
+                month_number=month_value,
+                month_text=month_label,
+                total_size=folder_size
+            )
+            records_to_persist.append(record)
+
+        if not records_to_persist:
+            return jsonify({'error': 'No se encontraron carpetas con archivos para guardar.'}), 400
+
+        db.session.add(summary_record)
+        db.session.add_all(records_to_persist)
+        db.session.commit()
+
+        current_app.logger.info(
+            'Se guardaron %s carpetas y 1 resumen agregado para %s',
+            len(records_to_persist),
+            folder_path
+        )
+        return jsonify({'status': 'ok', 'stored': len(records_to_persist), 'summary_id': summary_record.id})
+    except Exception as exc:
+        current_app.logger.exception('No se pudo guardar el resumen del escaneo para %s', folder_path)
+        db.session.rollback()
+        return jsonify({'error': f'No se pudo guardar el resumen: {exc}'}), 500

@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app.models.database import db, DynamicTable, TableField
 from sqlalchemy import inspect, text
 import re
 from typing import Dict, Any, List
+import os
+from pathlib import Path
 
 bp = Blueprint('tables', __name__, url_prefix='/tables')
 
@@ -60,6 +62,10 @@ def _collect_table_fields(table: DynamicTable) -> List[TableField]:
     return sorted(table.fields, key=lambda f: (0 if f.name == 'id' else 1, f.id))
 
 
+def _field_display_name(field: TableField) -> str:
+    return field.description or field.name
+
+
 def _to_python_value(field: TableField, raw: str) -> Any:
     if raw is None:
         return None
@@ -75,7 +81,7 @@ def _to_python_value(field: TableField, raw: str) -> Any:
             return 1 if raw in ('1', 'true', 'on') else 0
         return raw
     except ValueError:
-        raise ValueError(f'El campo "{field.name}" no tiene un valor válido.')
+        raise ValueError(f'El campo "{_field_display_name(field)}" no tiene un valor válido.')
 
 
 def _present_value(field: TableField, value: Any) -> str:
@@ -140,7 +146,8 @@ def create_table():
             field_type=TableField.FieldTypes.INTEGER,
             is_required=True,
             is_primary_key=True,
-            is_auto_increment=True
+            is_auto_increment=True,
+            description='Identificador único autoincremental'
         )
         db.session.add(id_field)
         db.session.commit()
@@ -195,6 +202,8 @@ def add_field(table_id):
             flash('Ya existe un campo con ese nombre en esta tabla.', 'error')
             return redirect(url_for('tables.add_field', table_id=table_id))
         
+        description = (request.form.get('description') or '').strip() or None
+
         field = TableField(
             table_id=table_id,
             name=name,
@@ -202,7 +211,8 @@ def add_field(table_id):
             is_required=is_required,
             is_primary_key=is_primary_key,
             is_auto_increment=is_auto_increment,
-            default_value=default_value
+            default_value=default_value,
+            description=description
         )
         
         db.session.add(field)
@@ -233,6 +243,7 @@ def edit_field(table_id, field_id):
         field.is_primary_key = 'is_primary_key' in request.form
         field.is_auto_increment = 'is_auto_increment' in request.form
         field.default_value = request.form.get('default_value')
+        field.description = (request.form.get('description') or '').strip() or None
         
         db.session.commit()
         flash('Campo actualizado correctamente.', 'success')
@@ -342,6 +353,47 @@ def manage_records(table_id):
     return render_template('tables/records_list.html', table=table, fields=fields, rows=rows)
 
 
+@bp.route('/<int:table_id>/records/delete-all', methods=['POST'])
+def delete_all_records(table_id: int):
+    """Elimina todos los registros de la tabla dinámica seleccionada."""
+    table = DynamicTable.query.get_or_404(table_id)
+
+    try:
+        with db.engine.begin() as connection:
+            connection.execute(text(f'DELETE FROM "{table.name}"'))
+        flash('Se eliminaron todos los registros de la tabla seleccionada.', 'success')
+    except Exception as exc:
+        flash(f'No se pudo eliminar el contenido de la tabla: {exc}', 'error')
+
+    return redirect(url_for('tables.manage_records', table_id=table_id))
+
+
+@bp.route('/open-folder', methods=['POST'])
+def open_parent_folder():
+    """Abre el explorador de archivos apuntando a la ruta indicada."""
+    payload = request.get_json(silent=True) or {}
+    raw_path = (payload.get('path') or '').strip()
+
+    if not raw_path:
+        return jsonify({'error': 'No se proporcionó la ruta a abrir.'}), 400
+
+    path_obj = Path(raw_path)
+    if not path_obj.exists():
+        return jsonify({'error': 'La ruta solicitada no existe.'}), 404
+
+    target = path_obj if path_obj.is_dir() else path_obj.parent
+
+    try:
+        if os.name == 'nt':
+            os.startfile(str(target))  # type: ignore[attr-defined]
+        else:
+            raise RuntimeError('Solo disponible en Windows.')
+    except Exception as exc:
+        return jsonify({'error': f'No se pudo abrir el explorador: {exc}'}), 500
+
+    return jsonify({'status': 'ok'})
+
+
 @bp.route('/<int:table_id>/records/add', methods=['GET', 'POST'])
 def add_record(table_id):
     table = DynamicTable.query.get_or_404(table_id)
@@ -361,7 +413,7 @@ def add_record(table_id):
                 raw_value = '1' if request.form.get(field.name) else '0'
 
             if field.is_required and (raw_value is None or str(raw_value).strip() == ''):
-                errors.append(f'El campo "{field.name}" es obligatorio.')
+                errors.append(f'El campo "{_field_display_name(field)}" es obligatorio.')
                 form_data[field.name] = raw_value
                 continue
 

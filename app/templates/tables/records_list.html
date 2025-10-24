@@ -13,6 +13,13 @@
                 {% endif %}
             </div>
             <div class="d-flex gap-2">
+                <form action="{{ url_for('tables.delete_all_records', table_id=table.id) }}"
+                      method="POST"
+                      onsubmit="return confirm('¿Seguro que deseas eliminar todos los registros de esta tabla?');">
+                    <button type="submit" class="btn btn-danger">
+                        Eliminar Todos
+                    </button>
+                </form>
                 <a href="{{ url_for('tables.add_record', table_id=table.id) }}" class="btn btn-success">
                     Añadir Registro
                 </a>
@@ -38,7 +45,12 @@
                         <thead>
                             <tr>
                                 {% for field in fields %}
-                                <th>{{ field.name }}</th>
+                                <th>
+                                    {{ field.description or field.name }}
+                                    {% if field.description %}
+                                    <div class="small text-muted">({{ field.name }})</div>
+                                    {% endif %}
+                                </th>
                                 {% endfor %}
                                 <th>Acciones</th>
                             </tr>
@@ -47,7 +59,17 @@
                             {% for row in rows %}
                             <tr>
                                 {% for field in fields %}
-                                <td>{{ row[field.name] }}</td>
+                                <td>
+                                    {% if field.name == 'parent_path' and row[field.name] %}
+                                                     <a href="#"
+                                                         class="text-decoration-none js-open-folder"
+                                                         data-folder-path="{{ row[field.name]|e }}">
+                                            {{ row[field.name] }}
+                                        </a>
+                                    {% else %}
+                                        {{ row[field.name] }}
+                                    {% endif %}
+                                </td>
                                 {% endfor %}
                                 <td>
                                     <div class="btn-group" role="group">
@@ -77,4 +99,40 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('click', function(event) {
+    const link = event.target.closest('.js-open-folder');
+    if (!link) {
+        return;
+    }
+
+    event.preventDefault();
+    const folderPath = link.dataset.folderPath;
+    if (!folderPath) {
+        return;
+    }
+
+    fetch('{{ url_for("tables.open_parent_folder") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ path: folderPath })
+    }).then(response => {
+        if (response.ok) {
+            return;
+        }
+        return response.json().then(payload => {
+            const message = payload && payload.error ? payload.error : 'No se pudo abrir la carpeta.';
+            throw new Error(message);
+        });
+    }).catch(error => {
+        alert(error.message || 'No se pudo abrir la carpeta seleccionada.');
+    });
+});
+</script>
 {% endblock %}

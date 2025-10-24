@@ -1,7 +1,7 @@
 """
 Rutas para la gestión de videos
 """
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, Markup
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, Markup, current_app
 from app.models.movie import Movie
 from app.models.database import TipoSoporte
 from app.services.video import VideoService
@@ -219,11 +219,11 @@ def index():
     try:
         total = Movie.query.count()
         sample = Movie.query.order_by(Movie.num).limit(10).all()
-        print(f"[Videos] Registros en DB: {total}")
-        for m in sample:
-            print(f"[Videos] #{m.num} - {m.title}")
-    except Exception as e:
-        print(f"[Videos] Error al leer registros para imprimir: {e}")
+        current_app.logger.debug("[Videos] Registros en DB: %s", total)
+        for movie in sample:
+            current_app.logger.debug("[Videos] #%s - %s", movie.num, movie.title)
+    except Exception as exc:
+        current_app.logger.exception("[Videos] Error al leer registros para imprimir: %s", exc)
 
     return render_template('videos/index.html',
                          videos=videos,

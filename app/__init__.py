@@ -35,7 +35,7 @@ def create_app(config_class=Config):
         app.logger.setLevel(logging.INFO)
         app.logger.info('Aplicación iniciada, logger a fichero configurado.')
     except Exception as e:
-        print(f'No se pudo configurar logging a fichero: {e}')
+        app.logger.warning('No se pudo configurar logging a fichero: %s', e)
     
     # Registrar blueprints
     from .routes import main, api, maintenance, tables, videos
@@ -51,6 +51,14 @@ def create_app(config_class=Config):
     
     with app.app_context():
         db.create_all()
+    from .models.database import (
+        ensure_table_field_description_column,
+        ensure_photos_scan_table,
+        ensure_photos_scan_summary_table,
+    )
+    ensure_table_field_description_column(app)
+    ensure_photos_scan_table(app)
+    ensure_photos_scan_summary_table(app)
         
     # Inicializar extensiones de archivo
     from .models.database import FileType, init_existing_tables
@@ -63,6 +71,6 @@ def create_app(config_class=Config):
     if os.getenv('IMPORT_LEGACY_SQL', '').lower() in ['1', 'true', 'yes']:
         import_sql_file(app=app)
     else:
-        print('IMPORT_LEGACY_SQL no activado. Para ejecutar Cintas.sql establece IMPORT_LEGACY_SQL=1 en el entorno.')
+        app.logger.info('IMPORT_LEGACY_SQL no activado. Para ejecutar Cintas.sql establece IMPORT_LEGACY_SQL=1 en el entorno.')
     
     return app

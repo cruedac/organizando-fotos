@@ -20,14 +20,16 @@
 
         <form method="POST">
             {% for field in fields %}
+            {% set field_label = field.description or field.name %}
             <div class="mb-3">
-                <label for="field_{{ field.name }}" class="form-label">{{ field.name }}</label>
                 {% if field.field_type == 'BOOLEAN' %}
+                <p class="mb-1 fw-semibold">{{ field_label }}</p>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="field_{{ field.name }}" name="{{ field.name }}" {% if form_data[field.name] == '1' %}checked{% endif %}>
                     <label class="form-check-label" for="field_{{ field.name }}">Sí / No</label>
                 </div>
                 {% else %}
+                <label for="field_{{ field.name }}" class="form-label">{{ field_label }}</label>
                 {% set input_type = 'text' %}
                 {% if field.field_type == 'INTEGER' %}
                     {% set input_type = 'number' %}
@@ -45,6 +47,9 @@
                        value="{{ form_data[field.name] }}"
                        {% if field.field_type == 'REAL' %}step="any"{% endif %}
                        {% if field.is_required %}required{% endif %}>
+                {% endif %}
+                {% if field.description %}
+                <div class="form-text text-muted">Nombre interno: {{ field.name }}</div>
                 {% endif %}
             </div>
             {% endfor %}
