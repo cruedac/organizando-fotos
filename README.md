@@ -52,6 +52,11 @@ Aplicación web en Flask para organizar archivos multimedia. Proporciona una int
 
 ### Análisis de Archivos
 - Escaneo configurable de directorios (con/sin subdirectorios)
+- **Progreso en tiempo real durante el escaneo:**
+  - Contador de archivos encontrados por tipo (imágenes, videos, audios)
+  - Tiempo transcurrido actualizado cada segundo
+  - Actualizaciones vía Server-Sent Events (SSE)
+  - Indicadores visuales de progreso (spinner, barra de progreso)
 - Estadísticas detalladas:
   - Conteo por tipo de archivo
   - Distribución por extensión
@@ -141,23 +146,51 @@ http://localhost:5000
    - Gestionar información de videos analógicos y digitales
 
 ## Tecnologías Utilizadas
-- Flask: Framework web
-- SQLAlchemy: ORM para base de datos
-- Bootstrap: Framework CSS
-- Python-dotenv: Gestión de configuración
-- Jinja2: Motor de plantillas
-- SQLite: Base de datos relacional
+- **Flask 2.0.3**: Framework web
+- **SQLAlchemy 1.4**: ORM para base de datos
+- **Flask-Caching**: Sistema de cacheo en memoria para optimización
+- **Bootstrap 5**: Framework CSS para interfaz responsive
+- **Python-dotenv**: Gestión de configuración
+- **Jinja2**: Motor de plantillas
+- **SQLite**: Base de datos relacional
+- **Pillow**: Procesamiento de imágenes
+- **Threading & Queue**: Procesamiento asíncrono para progreso en tiempo real
+- **Server-Sent Events (SSE)**: Actualizaciones en tiempo real al cliente
+
+## Optimizaciones Implementadas
+- ✅ **Sistema de cacheo** con Flask-Caching (timeout 5 minutos)
+- ✅ **Índices en base de datos** para búsquedas rápidas (año, categoría, tipo de medio)
+- ✅ **Paginación** en listados de videos (25 registros por página)
+- ✅ **Consolidación de código** con utilidades compartidas (date_utils.py)
+- ✅ **Progreso en tiempo real** mediante SSE con threading
+- ✅ **Logs rotativos** para monitoreo (UTF-8, tamaño máximo 10MB)
+
+## Deployment
+Esta aplicación requiere **servidor con control completo** (VPS, servidor dedicado, o Docker).
+
+**NO es compatible con hosting compartido** (Hostinger, GoDaddy, Bluehost shared hosting) porque requiere:
+- Acceso SSH y permisos para instalar paquetes
+- Proceso Python persistente en ejecución
+- Control sobre servidor web y proxy inverso
+
+**Opciones de deployment viables:**
+1. **Docker** (recomendado) - Ver `deploy/README.md`
+2. **VPS Linux** (DigitalOcean, Linode, AWS EC2)
+3. **Desarrollo local** (Windows, Linux, macOS)
+
+Consulta la documentación completa en `deploy/README.md`.
 
 ## Estado del Proyecto
 - [x] Interfaz web responsive
 - [x] Sistema de blueprints Flask
 - [x] Gestión de tablas dinámicas
-- [x] Análisis de directorios
+- [x] Análisis de directorios con progreso en tiempo real
 - [x] API REST para escaneo
 - [x] Importación de archivos
 - [x] Gestión de metadatos de video
 - [x] Catálogo de videos
+- [x] Sistema de cacheo y optimización
 - [ ] Organización automática
-- [ ] Sistema de usuarios
-- [ ] Procesamiento de imágenes
-- [ ] API completa
+- [ ] Sistema de usuarios y autenticación
+- [ ] Procesamiento avanzado de imágenes
+- [ ] API completa RESTful

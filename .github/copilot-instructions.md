@@ -20,7 +20,13 @@
 
 - **Media Scanning Workflow**
   - `scan_for_media_recursive` normalises extensions to lowercase and counts totals/by-extension; it honours the `scan_subdirs` flag by switching between `os.walk` and a shallow listing. Both `main.scan_directory` and `api.scan_folder` fetch extensions from the DB, so extend `FileType` entries before expecting new formats to be recognised.
+  - **Real-time progress**: `/scan-progress` endpoint uses Server-Sent Events (SSE) with threading and queue. The scan runs in a separate thread, pushing progress updates via `progress_callback` (every 5 files). The frontend uses fetch streaming API to receive events: 'start', 'progress', 'complete', 'error', and heartbeat signals.
   - Windows drive and directory browsing for the UI lives in `main.list_drives` / `main.list_directory`; keep Windows path quirks in mind when accepting user input.
+
+- **Caching & Performance**
+  - Flask-Caching configured with SimpleCache backend (5-minute timeout) in `app/__init__.py`. File type and support type queries are cached via `app/services/file_type_cache.py` and `app/services/support_type_cache.py`.
+  - DB indices exist on `Movie` table for `YEAR`, `CATEGORY`, and `MEDIATYPE` columns—keep these in sync when modifying the schema.
+  - Cache invalidation happens in maintenance routes when file types or support types are modified.
 
 - **Video Catalogue**
   - Field definitions for forms/detail views are centralised in `videos.py` (`MOVIE_FIELD_DEFINITIONS`). Any new field must be added there, to the template, and to the `Movie` model.
@@ -37,3 +43,9 @@
 
 - **Testing & Verification**
   - No automated tests today; verify changes by running the Flask server and exercising affected blueprints. For DB migrations or dynamic table changes, inspect `data/multimedia.db` (e.g., with `sqlite3`) after running through the UI.
+
+- **Deployment**
+  - This application requires a server with full control (VPS, dedicated server, or Docker). **NOT compatible** with shared hosting (Hostinger, GoDaddy, Bluehost) due to requirements: SSH access, persistent Python process, custom package installation.
+  - Viable deployment options: Docker (recommended - see `deploy/README.md`), VPS Linux (DigitalOcean, Linode, AWS EC2), or local development.
+  - Docker setup uses `deploy/Dockerfile` and `deploy/docker-compose.yml`. For VPS, use `deploy/supervisor.conf` for process management and `deploy/nginx.conf` for reverse proxy.
+  - Never suggest Hostinger shared hosting as a deployment option—it's explicitly incompatible.
