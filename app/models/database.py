@@ -44,6 +44,11 @@ def init_existing_tables(app):
                     # Obtener información de las columnas
                     columns = inspector.get_columns(table_name)
                     for column in columns:
+                        # Convertir autoincrement a booleano (SQLite puede devolver 'auto')
+                        autoincrement_value = column.get('autoincrement', False)
+                        if isinstance(autoincrement_value, str):
+                            autoincrement_value = autoincrement_value.lower() in ('true', 'auto', '1')
+                        
                         # Crear entrada en table_field
                         field = TableField(
                             table_id=table.id,
@@ -51,7 +56,7 @@ def init_existing_tables(app):
                             field_type=str(column['type']).upper(),
                             is_required=not column['nullable'],
                             is_primary_key=column.get('primary_key', False),
-                            is_auto_increment=column.get('autoincrement', False),
+                            is_auto_increment=bool(autoincrement_value),
                             default_value=str(column.get('default', '')) if column.get('default') is not None else None,
                             description=None
                         )

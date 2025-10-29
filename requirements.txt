@@ -1,13 +1,14 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.1.1
-Pillow==10.0.1
-python-magic==0.4.27
-watchdog==3.0.0
-python-dotenv==1.0.0
-Jinja2==3.1.2
-Werkzeug==2.3.7
-SQLAlchemy==2.0.21
-click==8.1.7
-itsdangerous==2.1.2
-markupsafe==2.1.3
-mutagen==1.47.0
+Flask==2.0.3
+Flask-SQLAlchemy==2.5.1
+Flask-Caching==1.11.1
+Pillow>=10.0.0
+# Eliminado python-magic (requiere libmagic del sistema)
+# Eliminado watchdog (solo para autoreload en desarrollo)
+python-dotenv==0.20.0
+Jinja2==3.0.3
+Werkzeug==2.0.3
+SQLAlchemy==1.4.27
+click==8.0.4
+itsdangerous==2.0.1
+MarkupSafe==2.0.1
+mutagen==1.46.0

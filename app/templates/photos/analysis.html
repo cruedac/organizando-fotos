@@ -53,8 +53,22 @@
                 
                 <div class="d-grid gap-2 mb-4">
                     <button class="btn btn-success" id="scanButton" disabled>
-                        Analizar Contenido
+                        <span id="scanButtonText"></span>Analizar Contenido</span>
+                        <span id="scanButtonSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
                     </button>
+                </div>
+                
+                <!-- Indicador de progreso -->
+                <div id="scanProgress" class="alert alert-info" role="alert" style="display: none;">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-3" role="status">
+                            <span class="visually-hidden">Analizando...</span>
+                        </div>
+                        <div>
+                            <strong>Analizando carpeta...</strong>
+                            <div class="small" id="scanProgressText">Por favor espera mientras se escanean los archivos</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="results" class="mt-4" style="display: none;">
@@ -206,8 +220,47 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Mostrar indicador de carga
+        const scanButton = document.getElementById('scanButton');
+        const scanButtonText = document.getElementById('scanButtonText');
+        const scanButtonSpinner = document.getElementById('scanButtonSpinner');
+        const scanProgress = document.getElementById('scanProgress');
+        const scanProgressText = document.getElementById('scanProgressText');
+        const resultsDiv = document.getElementById('results');
+        
+        scanButton.disabled = true;
+        scanButtonText.textContent = 'Analizando...';
+        scanButtonSpinner.style.display = 'inline-block';
+        scanProgress.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        
+        // Actualizar texto de progreso
+        const startTime = Date.now();
+        let currentTotals = { image: 0, video: 0, audio: 0, other: 0 };
+        
+        const updateProgressText = () => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const parts = [];
+            if (currentTotals.image > 0) parts.push(`${currentTotals.image} imágenes`);
+            if (currentTotals.video > 0) parts.push(`${currentTotals.video} videos`);
+            if (currentTotals.audio > 0) parts.push(`${currentTotals.audio} audios`);
+            if (currentTotals.other > 0) parts.push(`${currentTotals.other} otros`);
+            
+            const filesText = parts.length > 0 ? parts.join(', ') : 'Buscando archivos';
+            scanProgressText.innerHTML = `<strong>Encontrados:</strong> ${filesText}<br><small class="text-muted">${elapsed}s transcurridos</small>`;
+        };
+        
+        const progressInterval = setInterval(updateProgressText, 500);
+        
         try {
-            const response = await fetch('/scan', {
+            // Usar EventSource para recibir actualizaciones en tiempo real
+            const eventSource = new EventSource('/scan-progress?' + new URLSearchParams({
+                folder_path: folderPath,
+                scan_subdirs: scanSubdirs
+            }));
+            
+            // Pero necesitamos POST, así que usamos fetch con streaming
+            const response = await fetch('/scan-progress', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -218,24 +271,72 @@ document.addEventListener('DOMContentLoaded', function() {
                 }),
             });
             
-            const data = await response.json();
-            if (response.ok) {
-                lastScanState = {
-                    folderPath,
-                    scanSubdirs,
-                    totals: data.totals,
-                    by_extension: data.by_extension,
-                    summary: data.summary,
-                    directorySummaries: data.directory_summaries || [],
-                    directoriesCount: typeof data.directories_count === 'number' ? data.directories_count : (data.directory_summaries || []).length
-                };
-                displayResults(data);
-                showSavePrompt(lastScanState);
-            } else {
-                alert('Error: ' + data.error);
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
             }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop(); // Guardar la última línea incompleta
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            console.log('Evento recibido:', data); // Debug
+                            
+                            if (data.type === 'progress') {
+                                // Actualizar contadores en tiempo real
+                                currentTotals = data.totals;
+                                updateProgressText();
+                            } else if (data.type === 'complete') {
+                                // Procesar resultado final
+                                clearInterval(progressInterval);
+                                
+                                lastScanState = {
+                                    folderPath,
+                                    scanSubdirs,
+                                    totals: data.totals,
+                                    by_extension: data.by_extension,
+                                    summary: data.summary,
+                                    directorySummaries: data.directory_summaries || [],
+                                    directoriesCount: data.directories_count || 0
+                                };
+                                displayResults(data);
+                                showSavePrompt(lastScanState);
+                            } else if (data.type === 'error' || data.error) {
+                                clearInterval(progressInterval);
+                                alert('Error: ' + (data.error || 'Error desconocido'));
+                            }
+                        } catch (e) {
+                            console.error('Error parseando evento:', line, e);
+                        }
+                    } else if (line.startsWith(': ')) {
+                        // Heartbeat, ignorar
+                        console.log('Heartbeat recibido');
+                    }
+                }
+            }
+            
         } catch (error) {
+            clearInterval(progressInterval);
+            console.error('Error en el escaneo:', error);
             alert('Error al analizar la carpeta: ' + error);
+        } finally {
+            // Ocultar indicador de carga
+            scanButton.disabled = false;
+            scanButtonText.textContent = 'Analizar Contenido';
+            scanButtonSpinner.style.display = 'none';
+            scanProgress.style.display = 'none';
         }
     });
 

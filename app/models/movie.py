@@ -13,6 +13,13 @@ from datetime import datetime, date
 class Movie(db.Model):
     """Modelo para almacenar información sobre videos/películas"""
     __tablename__ = 'movies'
+    
+    # Índices para optimizar búsquedas frecuentes
+    __table_args__ = (
+        db.Index('idx_movie_year', 'YEAR'),
+        db.Index('idx_movie_category', 'CATEGORY'),
+        db.Index('idx_movie_mediatype', 'MEDIATYPE'),
+    )
 
     num = db.Column('NUM', db.Integer, primary_key=True)
     checked = db.Column('CHECKED', db.String(5))

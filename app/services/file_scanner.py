@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, Set, List
+from typing import Dict, Any, Set, List, Callable, Optional
 
 NO_EXTENSION = '<no_ext>'
 
@@ -8,7 +8,8 @@ def scan_for_media_recursive(
     image_extensions: Set[str] = None,
     video_extensions: Set[str] = None,
     audio_extensions: Set[str] = None,
-    scan_subdirs: bool = True
+    scan_subdirs: bool = True,
+    progress_callback: Optional[Callable[[Dict[str, int]], None]] = None
 ) -> Dict[str, Any]:
     """Recursively scans folder_path and counts files by type and extension.
     
@@ -17,6 +18,8 @@ def scan_for_media_recursive(
         image_extensions: Set of image file extensions (e.g., {'.jpg', '.png'})
         video_extensions: Set of video file extensions (e.g., {'.mp4', '.avi'})
         audio_extensions: Set of audio file extensions (e.g., {'.mp3', '.wav'})
+        scan_subdirs: Whether to scan subdirectories
+        progress_callback: Optional callback function that receives current totals
     
     Returns:
         Dict with 'totals' and 'by_extension' statistics
@@ -30,6 +33,7 @@ def scan_for_media_recursive(
     by_extension: Dict[str, int] = {}
     per_directory: Dict[str, Dict[str, Any]] = {}
     total_size = 0
+    files_processed = 0
 
     # Si scan_subdirs es False, solo escaneamos el directorio actual
     if scan_subdirs:
@@ -61,9 +65,7 @@ def scan_for_media_recursive(
             if not ext_norm:
                 totals['other'] += 1
                 folder_totals['other'] += 1
-                continue
-
-            if ext_norm in norm_image:
+            elif ext_norm in norm_image:
                 totals['image'] += 1
                 folder_totals['image'] += 1
             elif ext_norm in norm_video:
@@ -75,6 +77,12 @@ def scan_for_media_recursive(
             else:
                 totals['other'] += 1
                 folder_totals['other'] += 1
+            
+            files_processed += 1
+            
+            # Enviar actualización de progreso cada 5 archivos
+            if progress_callback and files_processed % 5 == 0:
+                progress_callback(totals.copy())
 
         if sum(folder_totals.values()) > 0:
             per_directory[root] = {

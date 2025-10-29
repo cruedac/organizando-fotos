@@ -1,16 +1,23 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_caching import Cache
 from config import Config
 
 # Inicializar extensiones
 db = SQLAlchemy()
+cache = Cache()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     
+    # Configurar cache simple en memoria
+    app.config['CACHE_TYPE'] = 'simple'
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutos
+    
     # Inicializar extensiones
     db.init_app(app)
+    cache.init_app(app)
     
     # Asegurarse de que existan los directorios necesarios
     import os

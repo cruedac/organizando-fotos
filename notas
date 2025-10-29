@@ -1,2 +1,6 @@
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python run.py
+
+
+
+Conectarse ssh -p 65002 u451571940@195.179.239.167

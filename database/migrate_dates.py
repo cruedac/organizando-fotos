@@ -17,10 +17,18 @@ Uso:
 Advertencia: ejecutar solo después de backup.
 """
 import os
+import sys
 import shutil
 import sqlite3
 import json
 from datetime import datetime
+
+# Añadir el directorio raíz al path para importar módulos de la app
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+# Importar utilidad consolidada de normalización de fechas
+from app.services.date_utils import normalize_date_value
 
 # Intentar importar configuración de la app para obtener la ruta de la DB
 try:
@@ -159,31 +167,9 @@ try:
     skipped = 0
     for r in rows:
         try:
-            # Normalizar DATEADDED y DATEWATCHED
-            def norm_date(val):
-                if val is None:
-                    return None
-                s = str(val).strip()
-                if s == '' or s.lower() == 'none':
-                    return None
-                # Intentar parsear ISO (YYYY-MM-DD o similar)
-                try:
-                    # sqlite date column accepts 'YYYY-MM-DD'
-                    datetime.fromisoformat(s)
-                    return s
-                except Exception:
-                    # intentar heurística: extraer primera porción de 10 chars
-                    if len(s) >= 10:
-                        candidate = s[:10]
-                        try:
-                            datetime.fromisoformat(candidate)
-                            return candidate
-                        except Exception:
-                            return None
-                    return None
-
-            dateadded = norm_date(r['DATEADDED'])
-            datewatched = norm_date(r['DATEWATCHED'])
+            # Normalizar DATEADDED y DATEWATCHED usando utilidad consolidada
+            dateadded = normalize_date_value(r['DATEADDED'])
+            datewatched = normalize_date_value(r['DATEWATCHED'])
 
             values = [
                 r['NUM'], r['CHECKED'], r['COLORTAG'], r['MEDIA'], r['MEDIATYPE'], r['SOURCE'],

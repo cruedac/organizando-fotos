@@ -1,7 +1,13 @@
 import os
-from dotenv import load_dotenv
 
-# Cargar variables de entorno
+# Hacer opcional python-dotenv para entornos limitados
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # ImportError o cualquier fallo
+    def load_dotenv(*args, **kwargs):  # type: ignore
+        return False
+
+# Cargar variables de entorno si está disponible
 load_dotenv()
 
 class Config:

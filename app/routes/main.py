@@ -3,11 +3,15 @@ import os
 import re
 import string
 import tempfile
+import json
+import time
+import threading
+import queue
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, Response, stream_with_context
 from werkzeug.utils import secure_filename
 
 from app.models.database import (
@@ -19,6 +23,7 @@ from app.models.database import (
 )
 from app.services.file_scanner import NO_EXTENSION, scan_for_media_recursive
 from app.services.media_metadata import format_size, read_image_metadata, read_media_tags
+from app.services.date_utils import parse_year_from_name, parse_month_from_name, _MONTH_CANONICAL
 
 bp = Blueprint('main', __name__)
 
@@ -62,80 +67,6 @@ def _analysis_suggestions(category: str, registered: bool) -> list:
     return result
 
 
-_YEAR_PATTERN = re.compile(r'(19|20)\d{2}')
-_MONTH_VARIANTS = {
-    1: ['enero', 'ene', 'january', 'jan'],
-    2: ['febrero', 'feb', 'february'],
-    3: ['marzo', 'mar', 'march'],
-    4: ['abril', 'abr', 'april', 'apr'],
-    5: ['mayo', 'may'],
-    6: ['junio', 'jun', 'june'],
-    7: ['julio', 'jul', 'july'],
-    8: ['agosto', 'ago', 'august', 'aug'],
-    9: ['septiembre', 'setiembre', 'sep', 'sept', 'september'],
-    10: ['octubre', 'oct', 'october'],
-    11: ['noviembre', 'nov', 'november'],
-    12: ['diciembre', 'dic', 'december', 'dec'],
-}
-_MONTH_CANONICAL = {num: variants[0].capitalize() for num, variants in _MONTH_VARIANTS.items()}
-_MONTH_LOOKUP = {alias: num for num, variants in _MONTH_VARIANTS.items() for alias in variants}
-for number in range(1, 13):
-    _MONTH_LOOKUP[str(number)] = number
-    _MONTH_LOOKUP[f'{number:02d}'] = number
-
-
-def _parse_year_from_name(name: str) -> Optional[int]:
-    if not name:
-        return None
-    match = _YEAR_PATTERN.search(name)
-    if match:
-        value = int(match.group())
-        if 1900 <= value <= 2100:
-            return value
-    return None
-
-
-def _parse_month_from_name(name: str) -> Tuple[Optional[int], Optional[str]]:
-    if not name:
-        return None, None
-
-    month_number: Optional[int] = None
-    month_text: Optional[str] = None
-    cleaned = name.strip()
-    if not cleaned:
-        return None, None
-
-    prefix_match = re.match(r'(?P<num>\d{1,2})\D*(?P<rest>.*)$', cleaned)
-    if prefix_match:
-        try:
-            candidate = int(prefix_match.group('num'))
-            if 1 <= candidate <= 12:
-                month_number = candidate
-        except ValueError:
-            month_number = None
-        remainder = prefix_match.group('rest').strip(" -_.")
-        if remainder and any(char.isalpha() for char in remainder):
-            month_text = remainder
-
-    tokens = re.split(r'[\s\-_/.,]+', cleaned.lower())
-    for token in tokens:
-        if token in _MONTH_LOOKUP:
-            resolved = _MONTH_LOOKUP[token]
-            if month_number is None:
-                month_number = resolved
-            if not month_text:
-                month_text = _MONTH_CANONICAL.get(resolved)
-            break
-
-    if month_number and not month_text:
-        month_text = _MONTH_CANONICAL.get(month_number)
-
-    if month_text:
-        month_text = ' '.join(part.capitalize() for part in month_text.strip().split())
-
-    return month_number, month_text
-
-
 def _extract_year_and_month(path_obj: Path) -> Tuple[Optional[int], Optional[int], Optional[str]]:
     candidates = []
     current = path_obj
@@ -149,7 +80,7 @@ def _extract_year_and_month(path_obj: Path) -> Tuple[Optional[int], Optional[int
 
     year = None
     for candidate in candidates:
-        year_candidate = _parse_year_from_name(candidate)
+        year_candidate = parse_year_from_name(candidate)
         if year_candidate is not None:
             year = year_candidate
             break
@@ -157,7 +88,7 @@ def _extract_year_and_month(path_obj: Path) -> Tuple[Optional[int], Optional[int
     month_number = None
     month_text = None
     for candidate in candidates:
-        candidate_month, candidate_text = _parse_month_from_name(candidate)
+        candidate_month, candidate_text = parse_month_from_name(candidate)
         if candidate_month is None and candidate_text is None:
             continue
 
@@ -396,6 +327,129 @@ def list_directory():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/scan-progress', methods=['POST'])
+def scan_directory_progress():
+    """Escanea un directorio con actualizaciones de progreso en tiempo real mediante SSE"""
+    data = request.get_json()
+    folder_path = data.get('folder_path')
+    scan_subdirs = data.get('scan_subdirs', True)
+    
+    # Normalizar la ruta para manejar correctamente las barras en Windows
+    folder_path = os.path.normpath(folder_path)
+    
+    def generate():
+        """Generador que envía eventos SSE con el progreso"""
+        try:
+            # Validar que la ruta existe y es accesible
+            if not folder_path or not os.path.exists(folder_path):
+                yield f"data: {json.dumps({'error': 'El directorio no existe'})}\n\n"
+                return
+            if not os.path.isdir(folder_path):
+                yield f"data: {json.dumps({'error': 'La ruta especificada no es un directorio'})}\n\n"
+                return
+            if not os.access(folder_path, os.R_OK):
+                yield f"data: {json.dumps({'error': 'No hay permisos de lectura para el directorio'})}\n\n"
+                return
+            
+            # Obtener las extensiones desde la base de datos
+            extensions = {
+                'image': {ft.extension for ft in FileType.query.filter_by(type='image').all()},
+                'video': {ft.extension for ft in FileType.query.filter_by(type='video').all()},
+                'audio': {ft.extension for ft in FileType.query.filter_by(type='audio').all()}
+            }
+            
+            # Cola para comunicación entre threads
+            progress_queue = queue.Queue()
+            result_container = {'result': None, 'error': None}
+            
+            # Callback para enviar actualizaciones de progreso
+            def progress_callback(totals):
+                progress_queue.put({'type': 'progress', 'totals': totals})
+            
+            # Función que ejecuta el escaneo en un thread separado
+            def run_scan():
+                try:
+                    result = scan_for_media_recursive(
+                        folder_path,
+                        image_extensions=extensions['image'],
+                        video_extensions=extensions['video'],
+                        audio_extensions=extensions['audio'],
+                        scan_subdirs=scan_subdirs,
+                        progress_callback=progress_callback
+                    )
+                    result_container['result'] = result
+                    progress_queue.put({'type': 'done'})
+                except Exception as e:
+                    result_container['error'] = str(e)
+                    progress_queue.put({'type': 'error', 'error': str(e)})
+            
+            # Iniciar el escaneo en un thread separado
+            scan_thread = threading.Thread(target=run_scan)
+            scan_thread.daemon = True
+            scan_thread.start()
+            
+            # Enviar evento de inicio
+            yield f"data: {json.dumps({'type': 'start'})}\n\n"
+            
+            # Procesar eventos de la cola
+            while True:
+                try:
+                    # Esperar hasta 0.5 segundos por un evento
+                    event = progress_queue.get(timeout=0.5)
+                    
+                    if event['type'] == 'progress':
+                        # Enviar actualización de progreso
+                        yield f"data: {json.dumps(event)}\n\n"
+                    
+                    elif event['type'] == 'done':
+                        # Escaneo completado, preparar resultado final
+                        result = result_container['result']
+                        
+                        scan_timestamp = datetime.utcnow()
+                        directory_summaries = [
+                            {
+                                'path': d['path'],
+                                'totals': d['totals'],
+                                'by_extension': d['by_extension'],
+                                'total_size': d['total_size']
+                            }
+                            for d in result['directories']
+                        ]
+                        
+                        summary = {
+                            'folder_path': folder_path,
+                            'scan_subdirs': scan_subdirs,
+                            'total_size': result.get('total_size', 0),
+                            'scanned_at': scan_timestamp.isoformat()
+                        }
+                        
+                        response_data = {
+                            'type': 'complete',
+                            'totals': result['totals'],
+                            'by_extension': result['by_extension'],
+                            'summary': summary,
+                            'directory_summaries': directory_summaries,
+                            'directories_count': len(directory_summaries)
+                        }
+                        
+                        # Enviar evento de finalización
+                        yield f"data: {json.dumps(response_data)}\n\n"
+                        break
+                    
+                    elif event['type'] == 'error':
+                        yield f"data: {json.dumps(event)}\n\n"
+                        break
+                        
+                except queue.Empty:
+                    # No hay eventos, enviar un heartbeat para mantener la conexión viva
+                    yield f": heartbeat\n\n"
+                    continue
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
 @bp.route('/scan', methods=['POST'])
 def scan_directory():
     """Escanea un directorio en busca de archivos multimedia"""
@@ -561,7 +615,7 @@ def save_scan_summary():
             summary_month_text = None
 
         if summary_month_text:
-            parsed_month, parsed_text = _parse_month_from_name(summary_month_text)
+            parsed_month, parsed_text = parse_month_from_name(summary_month_text)
             if summary_month_number is None and parsed_month is not None:
                 summary_month_number = parsed_month
             if parsed_text:
@@ -621,7 +675,7 @@ def save_scan_summary():
                 month_label = None
 
             if month_label:
-                parsed_month_value, parsed_month_text = _parse_month_from_name(month_label)
+                parsed_month_value, parsed_month_text = parse_month_from_name(month_label)
                 if month_value is None and parsed_month_value is not None:
                     month_value = parsed_month_value
                 if parsed_month_text:

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app.services.file_scanner import scan_for_media_recursive
-from app.models.database import FileType
+from app.services.file_type_cache import get_allowed_extensions_cached
 
 bp = Blueprint('api', __name__)
 
@@ -14,19 +14,15 @@ def scan_folder():
         
     folder_path = data['folder_path']
     
-    # Obtener extensiones de la base de datos
-    extensions = {
-        'image': {ft.extension for ft in FileType.query.filter_by(type='image').all()},
-        'video': {ft.extension for ft in FileType.query.filter_by(type='video').all()},
-        'audio': {ft.extension for ft in FileType.query.filter_by(type='audio').all()}
-    }
+    # Obtener extensiones cacheadas (evita query a la DB en cada request)
+    extensions = get_allowed_extensions_cached()
     
     try:
         result = scan_for_media_recursive(
             folder_path,
-            image_extensions=extensions['image'],
-            video_extensions=extensions['video'],
-            audio_extensions=extensions['audio']
+            image_extensions=set(extensions['image']),
+            video_extensions=set(extensions['video']),
+            audio_extensions=set(extensions['audio'])
         )
         return jsonify(result)
     except Exception as e:

@@ -6,6 +6,7 @@ from app.models.movie import Movie
 from app.models.database import TipoSoporte
 from app.services.video import VideoService
 from app.services.video_import import import_sql_file
+from app.services.support_type_cache import get_support_types_cached
 from app import db
 import os
 import json
@@ -305,7 +306,7 @@ def manage():
 @bp.route('/add', methods=['GET', 'POST'])
 def add_movie():
     """Agregar nuevo registro a movies"""
-    support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
+    support_types = get_support_types_cached()  # Usar cache en lugar de query directa
     sections = _get_movie_form_sections()
 
     if request.method == 'POST':
@@ -336,7 +337,7 @@ def add_movie():
 def edit_movie(movie_id):
     """Editar un registro existente"""
     movie = Movie.query.get_or_404(movie_id)
-    support_types = TipoSoporte.query.order_by(TipoSoporte.tipo).all()
+    support_types = get_support_types_cached()  # Usar cache en lugar de query directa
     sections = _get_movie_form_sections()
 
     if request.method == 'POST':

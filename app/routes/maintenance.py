@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from sqlalchemy import func, text
 from app.models.database import db, FileType, TipoSoporte, DynamicTable
 from app.services.media_metadata import format_size
+from app.services.file_type_cache import clear_extensions_cache
+from app.services.support_type_cache import clear_support_types_cache
 from app.models.movie import Movie
 from sqlalchemy import inspect
 from pathlib import Path
@@ -194,6 +196,7 @@ def add_file_type():
             new_type = FileType(extension=extension, type=file_type)
             db.session.add(new_type)
             db.session.commit()
+            clear_extensions_cache()  # Limpiar cache después de añadir
             flash('Extensión añadida correctamente.', 'success')
             return redirect(url_for('maintenance.file_types'))
     
@@ -207,6 +210,7 @@ def edit_file_type(id):
     if request.method == 'POST':
         file_type.type = request.form.get('type')
         db.session.commit()
+        clear_extensions_cache()  # Limpiar cache después de editar
         flash('Tipo de archivo actualizado correctamente.', 'success')
         return redirect(url_for('maintenance.file_types'))
     
@@ -218,6 +222,7 @@ def delete_file_type(id):
     file_type = FileType.query.get_or_404(id)
     db.session.delete(file_type)
     db.session.commit()
+    clear_extensions_cache()  # Limpiar cache después de eliminar
     flash('Tipo de archivo eliminado correctamente.', 'success')
     return redirect(url_for('maintenance.file_types'))
 
@@ -247,6 +252,7 @@ def add_support_type():
                 support = TipoSoporte(tipo=tipo)
                 db.session.add(support)
                 db.session.commit()
+                clear_support_types_cache()  # Limpiar cache después de añadir
                 flash('Tipo de soporte añadido correctamente.', 'success')
                 return redirect(url_for('maintenance.support_types'))
 
@@ -281,6 +287,7 @@ def edit_support_type(support_id):
                         Movie.query.filter(Movie.mediatype == old_tipo).update({'mediatype': tipo}, synchronize_session=False)
                 support.tipo = tipo
                 db.session.commit()
+                clear_support_types_cache()  # Limpiar cache después de editar
                 flash('Tipo de soporte actualizado correctamente.', 'success')
                 return redirect(url_for('maintenance.support_types'))
 
@@ -293,6 +300,7 @@ def delete_support_type(support_id):
     support = TipoSoporte.query.get_or_404(support_id)
     db.session.delete(support)
     db.session.commit()
+    clear_support_types_cache()  # Limpiar cache después de eliminar
     flash('Tipo de soporte eliminado correctamente.', 'success')
     return redirect(url_for('maintenance.support_types'))
 
