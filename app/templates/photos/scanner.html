@@ -142,6 +142,9 @@
                 <div class="mb-3">
                     <label class="form-label">Ruta actual:</label>
                     <div class="input-group">
+                        <button class="btn btn-outline-primary" type="button" id="goToDrivesBtn" title="Ver unidades disponibles">
+                            <i class="bi bi-hdd"></i>
+                        </button>
                         <input type="text" class="form-control" id="currentPathDisplay" readonly>
                         <button class="btn btn-outline-secondary" type="button" id="goToParentBtn" title="Ir al directorio padre">
                             <i class="bi bi-arrow-up"></i>
@@ -344,18 +347,85 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Botón examinar - Abrir modal del explorador de carpetas
     document.getElementById('browseBtn').addEventListener('click', async function() {
-        // Obtener el directorio home para empezar
+        // Mostrar lista de unidades/drives disponibles
         try {
-            const response = await fetch('/photos/api/get-home-directory');
-            const data = await response.json();
-            currentBrowsePath = data.path;
-            await loadFolders(currentBrowsePath);
+            currentBrowsePath = null; // Resetear para mostrar drives
+            await loadDrivesOrFolders(null);
             folderBrowserModal.show();
         } catch (error) {
-            console.error('Error al obtener directorio home:', error);
+            console.error('Error al abrir el explorador de carpetas:', error);
             alert('Error al abrir el explorador de carpetas');
         }
     });
+
+    // Cargar unidades o carpetas dependiendo del path
+    async function loadDrivesOrFolders(path) {
+        if (path === null || path === undefined || path === '') {
+            // Mostrar unidades disponibles
+            await loadDrives();
+        } else {
+            // Mostrar carpetas del path
+            await loadFolders(path);
+        }
+    }
+
+    // Cargar lista de unidades disponibles
+    async function loadDrives() {
+        const folderList = document.getElementById('folderList');
+        folderList.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
+        
+        try {
+            const response = await fetch('/photos/api/get-drives');
+            
+            if (!response.ok) {
+                throw new Error('Error al obtener unidades');
+            }
+
+            const data = await response.json();
+            currentBrowsePath = null;
+            document.getElementById('currentPathDisplay').value = 'Seleccione una unidad';
+
+            // Renderizar lista de unidades
+            if (data.drives && data.drives.length > 0) {
+                folderList.innerHTML = '';
+                data.drives.forEach(drive => {
+                    const driveItem = document.createElement('div');
+                    driveItem.className = 'folder-item p-2 border-bottom';
+                    driveItem.style.cursor = 'pointer';
+                    
+                    let icon = 'bi-hdd-fill';
+                    if (drive.type === 'mount') icon = 'bi-folder-fill';
+                    if (drive.type === 'external') icon = 'bi-usb-drive-fill';
+                    
+                    let sizeInfo = '';
+                    if (drive.free && drive.total) {
+                        const freeGB = (drive.free / (1024**3)).toFixed(1);
+                        const totalGB = (drive.total / (1024**3)).toFixed(1);
+                        sizeInfo = `<small class="text-muted ms-2">(${freeGB} GB libres de ${totalGB} GB)</small>`;
+                    }
+                    
+                    driveItem.innerHTML = `
+                        <i class="bi ${icon} text-primary"></i>
+                        <span class="ms-2">${drive.name}</span>
+                        ${sizeInfo}
+                    `;
+                    driveItem.addEventListener('click', () => loadFolders(drive.path));
+                    driveItem.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                    });
+                    driveItem.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '';
+                    });
+                    folderList.appendChild(driveItem);
+                });
+            } else {
+                folderList.innerHTML = '<p class="text-muted text-center">No se encontraron unidades</p>';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            folderList.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+    }
 
     // Cargar carpetas
     async function loadFolders(path) {
@@ -409,16 +479,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Ir al directorio padre
     document.getElementById('goToParentBtn').addEventListener('click', async function() {
-        if (currentBrowsePath) {
-            const response = await fetch('/photos/api/browse-folders', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({path: currentBrowsePath})
-            });
-            const data = await response.json();
-            if (data.parent_path) {
-                await loadFolders(data.parent_path);
-            }
+        if (!currentBrowsePath) {
+            // Ya estamos en la vista de unidades, no hacer nada
+            return;
+        }
+        
+        const response = await fetch('/photos/api/browse-folders', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: currentBrowsePath})
+        });
+        const data = await response.json();
+        
+        if (data.parent_path) {
+            await loadFolders(data.parent_path);
+        } else {
+            // No hay padre, volver a mostrar unidades
+            await loadDrives();
         }
     });
 
@@ -427,6 +504,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const response = await fetch('/photos/api/get-home-directory');
         const data = await response.json();
         await loadFolders(data.path);
+    });
+    
+    // Botón para ver unidades disponibles
+    document.getElementById('goToDrivesBtn').addEventListener('click', async function() {
+        await loadDrives();
     });
 
     // Seleccionar carpeta actual

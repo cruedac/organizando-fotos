@@ -80,6 +80,93 @@ def get_home_directory():
     from pathlib import Path
     return jsonify({'path': str(Path.home())})
 
+@bp.route('/api/get-drives', methods=['GET'])
+def get_drives():
+    """Obtiene todas las unidades/drives disponibles en el sistema"""
+    import os
+    import platform
+    from pathlib import Path
+    
+    drives = []
+    system = platform.system()
+    
+    try:
+        if system == 'Windows':
+            # En Windows, listar todas las unidades de A: a Z:
+            import string
+            for letter in string.ascii_uppercase:
+                drive = f'{letter}:\\'
+                if os.path.exists(drive):
+                    try:
+                        # Intentar obtener información de la unidad
+                        total, used, free = 0, 0, 0
+                        try:
+                            import shutil
+                            usage = shutil.disk_usage(drive)
+                            total = usage.total
+                            used = usage.used
+                            free = usage.free
+                        except:
+                            pass
+                        
+                        drives.append({
+                            'name': f'Unidad {letter}:',
+                            'path': drive,
+                            'type': 'drive',
+                            'total': total,
+                            'used': used,
+                            'free': free
+                        })
+                    except:
+                        pass
+        else:
+            # En Linux/Mac, mostrar puntos de montaje comunes
+            common_mounts = [
+                ('/', 'Raíz del Sistema'),
+                (str(Path.home()), 'Carpeta Personal'),
+                ('/media', 'Medios Extraíbles'),
+                ('/mnt', 'Puntos de Montaje'),
+            ]
+            
+            for mount_path, name in common_mounts:
+                if os.path.exists(mount_path):
+                    try:
+                        # Verificar si es accesible
+                        os.listdir(mount_path)
+                        drives.append({
+                            'name': name,
+                            'path': mount_path,
+                            'type': 'mount'
+                        })
+                    except PermissionError:
+                        # Añadir aunque no tenga permisos, el usuario puede necesitarlo
+                        drives.append({
+                            'name': f'{name} (sin permisos)',
+                            'path': mount_path,
+                            'type': 'mount'
+                        })
+            
+            # Buscar unidades montadas en /media y /mnt
+            for base_path in ['/media', '/mnt']:
+                if os.path.exists(base_path):
+                    try:
+                        for item in os.listdir(base_path):
+                            item_path = os.path.join(base_path, item)
+                            if os.path.isdir(item_path):
+                                drives.append({
+                                    'name': item,
+                                    'path': item_path,
+                                    'type': 'external'
+                                })
+                    except:
+                        pass
+        
+        return jsonify({'drives': drives})
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting drives: {str(e)}")
+        return jsonify({'error': str(e), 'drives': []}), 500
+
 @bp.route('/scan-summary')
 def scan_summary():
     """Lista de resúmenes de escaneo"""
