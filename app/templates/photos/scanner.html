@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Scanner de Archivos Multimedia{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Scanner de Archivos Multimedia</h1>
+    
+    <div class="row mt-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-search"></i> Escanear Carpeta
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="scannerForm">
+                        <div class="mb-3">
+                            <label for="folderPath" class="form-label">Ruta de la carpeta a escanear</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="folderPath" name="folderPath" 
+                                       placeholder="/ruta/a/carpeta" required>
+                                <button class="btn btn-outline-secondary" type="button" id="browseBtn">
+                                    <i class="bi bi-folder"></i> Examinar
+                                </button>
+                            </div>
+                            <small class="text-muted">Ingrese la ruta absoluta de la carpeta que desea escanear</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="subdirs" name="subdirs" checked>
+                                <label class="form-check-label" for="subdirs">
+                                    Incluir subcarpetas
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fileTypes" class="form-label">Tipos de archivo a escanear</label>
+                            <div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="images" name="fileTypes" value="images" checked>
+                                    <label class="form-check-label" for="images">Imágenes</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="videos" name="fileTypes" value="videos" checked>
+                                    <label class="form-check-label" for="videos">Videos</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="audio" name="fileTypes" value="audio" checked>
+                                    <label class="form-check-label" for="audio">Audio</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-play-circle"></i> Iniciar Escaneo
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Progreso del escaneo -->
+            <div id="progressContainer" class="mt-4" style="display: none;">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-hourglass-split"></i> Escaneo en progreso
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%">
+                                0%
+                            </div>
+                        </div>
+                        <div id="progressStats" class="row text-center">
+                            <div class="col">
+                                <small>Archivos encontrados</small>
+                                <h6 id="filesFound">0</h6>
+                            </div>
+                            <div class="col">
+                                <small>Imágenes</small>
+                                <h6 id="imagesCount">0</h6>
+                            </div>
+                            <div class="col">
+                                <small>Videos</small>
+                                <h6 id="videosCount">0</h6>
+                            </div>
+                            <div class="col">
+                                <small>Audio</small>
+                                <h6 id="audioCount">0</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resultados del escaneo -->
+            <div id="resultsContainer" class="mt-4" style="display: none;">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-check-circle"></i> Escaneo completado
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultsSummary" class="mb-3"></div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('photos.scan_summary') }}" class="btn btn-primary">
+                                <i class="bi bi-arrow-right"></i> Ver Resumen de Archivos
+                            </a>
+                            <button type="button" class="btn btn-secondary" onclick="location.reload()">
+                                <i class="bi bi-arrow-clockwise"></i> Nuevo Escaneo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const scannerForm = document.getElementById('scannerForm');
+    const progressContainer = document.getElementById('progressContainer');
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    scannerForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const folderPath = document.getElementById('folderPath').value;
+        const subdirs = document.getElementById('subdirs').checked;
+        const fileTypes = Array.from(document.querySelectorAll('input[name="fileTypes"]:checked'))
+            .map(cb => cb.value);
+
+        if (!folderPath.trim()) {
+            alert('Por favor, ingrese una ruta válida');
+            return;
+        }
+
+        if (fileTypes.length === 0) {
+            alert('Por favor, seleccione al menos un tipo de archivo');
+            return;
+        }
+
+        // Mostrar progreso
+        scannerForm.style.display = 'none';
+        progressContainer.style.display = 'block';
+        resultsContainer.style.display = 'none';
+
+        // Simular escaneo (en producción, esto llamaría a un endpoint)
+        simulateScan();
+    });
+
+    function simulateScan() {
+        // Simulación del escaneo
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 30;
+            if (progress > 100) progress = 100;
+
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '%';
+
+            // Actualizar estadísticas simuladas
+            const filesCount = Math.floor(progress * 1.5);
+            document.getElementById('filesFound').textContent = filesCount;
+            document.getElementById('imagesCount').textContent = Math.floor(filesCount * 0.6);
+            document.getElementById('videosCount').textContent = Math.floor(filesCount * 0.3);
+            document.getElementById('audioCount').textContent = Math.floor(filesCount * 0.1);
+
+            if (progress >= 100) {
+                clearInterval(interval);
+                showResults();
+            }
+        }, 500);
+    }
+
+    function showResults() {
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            resultsContainer.style.display = 'block';
+
+            const resultsSummary = document.getElementById('resultsSummary');
+            const totalFiles = document.getElementById('filesFound').textContent;
+            const images = document.getElementById('imagesCount').textContent;
+            const videos = document.getElementById('videosCount').textContent;
+            const audio = document.getElementById('audioCount').textContent;
+
+            resultsSummary.innerHTML = `
+                <div class="alert alert-info">
+                    <h5>Resumen del Escaneo</h5>
+                    <ul class="mb-0">
+                        <li>Total de archivos encontrados: <strong>${totalFiles}</strong></li>
+                        <li>Imágenes: <strong>${images}</strong></li>
+                        <li>Videos: <strong>${videos}</strong></li>
+                        <li>Audio: <strong>${audio}</strong></li>
+                    </ul>
+                </div>
+            `;
+        }, 1000);
+    }
+
+    // Botón examinar (para futuras integraciones)
+    document.getElementById('browseBtn').addEventListener('click', function() {
+        alert('La funcionalidad de explorador de carpetas se implementará en futuras versiones');
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}Resúmenes de Escaneo{% endblock %}
+
+{% block styles %}
+<style>
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.9em;
+}
+.status-pending { background-color: #ffd700; }
+.status-in_progress { background-color: #87ceeb; }
+.status-completed { background-color: #90ee90; }
+.status-failed { background-color: #ffcccb; }
+
+.scan-card {
+    transition: all 0.3s ease;
+}
+.scan-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Análisis de Archivos Multimedia</h1>
+    </div>
+
+    <div class="row" id="summariesContainer">
+        {% for summary in summaries %}
+        <div class="col-md-6 mb-4">
+            <div class="card scan-card" data-id="{{ summary.id }}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="status-badge status-{{ summary.status }}">{{ summary.status|title }}</span>
+                    <small>{{ summary.scan_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ summary.directory }}</h5>
+                    <div class="progress mb-3">
+                        {% set progress = (summary.processed_files / summary.total_files * 100) if summary.total_files > 0 else 0 %}
+                        {% set progress_width = "%.1f"|format(progress) %}
+                        <div class="progress-bar" role="progressbar" style="width: {{ progress_width }}%">
+                            {{ progress_width }}%
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col">
+                            <small>Total</small>
+                            <h6>{{ summary.total_files }}</h6>
+                        </div>
+                        <div class="col">
+                            <small>Procesados</small>
+                            <h6>{{ summary.processed_files }}</h6>
+                        </div>
+                        <div class="col">
+                            <small>Fallidos</small>
+                            <h6>{{ summary.failed_files }}</h6>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('photos.edit_scan_summary', id=summary.id) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-edit"></i> Editar
+                    </a>
+                    <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ summary.id }}">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal para nuevo/editar escaneo -->
+<div class="modal fade" id="scanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Escaneo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="scanForm">
+                    <input type="hidden" id="summaryId">
+                    <div class="mb-3">
+                        <label for="directory" class="form-label">Directorio</label>
+                        <input type="text" class="form-control" id="directory" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="totalFiles" class="form-label">Total Archivos</label>
+                            <input type="number" class="form-control" id="totalFiles" min="0" value="0">
+                        </div>
+                        <div class="col">
+                            <label for="processedFiles" class="form-label">Procesados</label>
+                            <input type="number" class="form-control" id="processedFiles" min="0" value="0">
+                        </div>
+                        <div class="col">
+                            <label for="failedFiles" class="form-label">Fallidos</label>
+                            <input type="number" class="form-control" id="failedFiles" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Estado</label>
+                        <select class="form-select" id="status">
+                            <option value="pending">Pendiente</option>
+                            <option value="in_progress">En Progreso</option>
+                            <option value="completed">Completado</option>
+                            <option value="failed">Fallido</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="details" class="form-label">Detalles</label>
+                        <textarea class="form-control" id="details" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveScan">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Eliminar escaneo
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            if (confirm('¿Está seguro de que desea eliminar este resumen?')) {
+                const id = this.dataset.id;
+                try {
+                    const response = await fetch(`/photos/api/scan-summary/${id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        const error = await response.json();
+                        alert('Error: ' + error.message);
+                    }
+                } catch (error) {
+                    alert('Error al eliminar: ' + error);
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

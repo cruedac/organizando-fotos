@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Escaneo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h1>Editar Resumen de Escaneo</h1>
+            
+            {% if error %}
+            <div class="alert alert-danger" role="alert">
+                Error: {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Información General</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="path" class="form-label">Ruta</label>
+                                <input type="text" class="form-control" id="path" name="path" 
+                                       value="{{ summary.path or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="directory" class="form-label">Directorio</label>
+                                <input type="text" class="form-control" id="directory" name="directory" 
+                                       value="{{ summary.directory or '' }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="year" class="form-label">Año</label>
+                                <input type="number" class="form-control" id="year" name="year" 
+                                       value="{{ summary.year or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="month_text" class="form-label">Mes</label>
+                                <input type="text" class="form-control" id="month_text" name="month_text" 
+                                       value="{{ summary.month_text or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Conteos de Archivos</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="num_images" class="form-label">Número de Imágenes</label>
+                                <input type="number" class="form-control" id="num_images" name="num_images" 
+                                       value="{{ summary.num_images or 0 }}" min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="num_videos" class="form-label">Número de Videos</label>
+                                <input type="number" class="form-control" id="num_videos" name="num_videos" 
+                                       value="{{ summary.num_videos or 0 }}" min="0">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="total_files" class="form-label">Total de Archivos</label>
+                                <input type="number" class="form-control" id="total_files" name="total_files" 
+                                       value="{{ summary.total_files or 0 }}" min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="directories_count" class="form-label">Número de Directorios</label>
+                                <input type="number" class="form-control" id="directories_count" name="directories_count" 
+                                       value="{{ summary.directories_count or 0 }}" min="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Procesamiento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="processed_files" class="form-label">Archivos Procesados</label>
+                                <input type="number" class="form-control" id="processed_files" name="processed_files" 
+                                       value="{{ summary.processed_files or 0 }}" min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="failed_files" class="form-label">Archivos Fallidos</label>
+                                <input type="number" class="form-control" id="failed_files" name="failed_files" 
+                                       value="{{ summary.failed_files or 0 }}" min="0">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="status" class="form-label">Estado</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="pending" {% if summary.status == 'pending' %}selected{% endif %}>Pendiente</option>
+                                    <option value="in_progress" {% if summary.status == 'in_progress' %}selected{% endif %}>En Progreso</option>
+                                    <option value="completed" {% if summary.status == 'completed' %}selected{% endif %}>Completado</option>
+                                    <option value="failed" {% if summary.status == 'failed' %}selected{% endif %}>Fallido</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="total_size" class="form-label">Tamaño Total (bytes)</label>
+                                <input type="number" class="form-control" id="total_size" name="total_size" 
+                                       value="{{ summary.total_size or 0 }}" min="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Detalles Adicionales</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="details" class="form-label">Detalles</label>
+                            <textarea class="form-control" id="details" name="details" rows="4">{{ summary.details or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Guardar Cambios
+                    </button>
+                    <a href="{{ url_for('photos.scan_summary') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

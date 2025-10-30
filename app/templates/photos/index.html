@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Fotos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Gestión de Fotos</h1>
+    <div class="row mt-4">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-search"></i> Scanner de Archivos Multimedia
+                    </h5>
+                    <p class="card-text">Escanear carpetas en busca de archivos multimedia (imágenes, videos y audio).</p>
+                    <a href="{{ url_for('photos.scanner') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-right"></i> Ir a Scanner
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-graph-up"></i> Resumen de Archivos Multimedia
+                    </h5>
+                    <p class="card-text">Ver y gestionar los resúmenes de los escaneos realizados.</p>
+                    <a href="{{ url_for('photos.scan_summary') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-right"></i> Ver Resumen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -45,9 +45,10 @@ def create_app(config_class=Config):
         app.logger.warning('No se pudo configurar logging a fichero: %s', e)
     
     # Registrar blueprints
-    from .routes import main, api, maintenance, tables, videos
+    from .routes import main, api, maintenance, tables, videos, photos
     app.register_blueprint(main.bp)
     app.register_blueprint(api.bp, url_prefix='/api')
+    app.register_blueprint(photos.bp)
     app.register_blueprint(maintenance.bp)
     app.register_blueprint(tables.bp)
     app.register_blueprint(videos.bp)
