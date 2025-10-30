@@ -109,9 +109,15 @@
                     </div>
                     <div class="card-body">
                         <div id="resultsSummary" class="mb-3"></div>
+                        <div id="saveStatus" class="alert alert-info" style="display: none;">
+                            <i class="bi bi-info-circle"></i> <span id="saveStatusText"></span>
+                        </div>
                         <div class="d-flex gap-2">
-                            <a href="{{ url_for('photos.scan_summary') }}" class="btn btn-primary">
-                                <i class="bi bi-arrow-right"></i> Ver Resumen de Archivos
+                            <button type="button" class="btn btn-primary" id="saveResultsBtn">
+                                <i class="bi bi-save"></i> Guardar Resumen
+                            </button>
+                            <a href="{{ url_for('photos.scan_summary') }}" class="btn btn-outline-primary">
+                                <i class="bi bi-list"></i> Ver Resúmenes Guardados
                             </a>
                             <button type="button" class="btn btn-secondary" onclick="location.reload()">
                                 <i class="bi bi-arrow-clockwise"></i> Nuevo Escaneo
@@ -119,6 +125,43 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de explorador de carpetas -->
+<div class="modal fade" id="folderBrowserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Seleccionar Carpeta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Ruta actual:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="currentPathDisplay" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="goToParentBtn" title="Ir al directorio padre">
+                            <i class="bi bi-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button" id="goToHomeBtn" title="Ir al directorio home">
+                            <i class="bi bi-house"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="folderList" class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="selectFolderBtn">Seleccionar esta carpeta</button>
             </div>
         </div>
     </div>
@@ -131,6 +174,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const scannerForm = document.getElementById('scannerForm');
     const progressContainer = document.getElementById('progressContainer');
     const resultsContainer = document.getElementById('resultsContainer');
+    const folderBrowserModal = new bootstrap.Modal(document.getElementById('folderBrowserModal'));
+    let currentBrowsePath = '';
+    let lastScanResults = null; // Guardar los resultados del último escaneo
 
     scannerForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -155,63 +201,238 @@ document.addEventListener('DOMContentLoaded', function() {
         progressContainer.style.display = 'block';
         resultsContainer.style.display = 'none';
 
-        // Simular escaneo (en producción, esto llamaría a un endpoint)
-        simulateScan();
+        // Ejecutar escaneo real
+        performScan(folderPath, subdirs, fileTypes);
     });
 
-    function simulateScan() {
-        // Simulación del escaneo
+    async function performScan(folderPath, scanSubdirs, fileTypes) {
+        try {
+            const response = await fetch('/photos/api/scan-folder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    folder_path: folderPath,
+                    scan_subdirs: scanSubdirs,
+                    file_types: fileTypes
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al realizar el escaneo');
+            }
+
+            const data = await response.json();
+            lastScanResults = data; // Guardar resultados
+            
+            // Simular progreso visual
+            simulateProgress(data);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al escanear: ' + error.message);
+            scannerForm.style.display = 'block';
+            progressContainer.style.display = 'none';
+        }
+    }
+
+    function simulateProgress(scanData) {
+        // Animación rápida de progreso
         let progress = 0;
         const interval = setInterval(() => {
-            progress += Math.random() * 30;
+            progress += 20;
             if (progress > 100) progress = 100;
 
             const progressBar = document.getElementById('progressBar');
             progressBar.style.width = progress + '%';
             progressBar.textContent = Math.round(progress) + '%';
 
-            // Actualizar estadísticas simuladas
-            const filesCount = Math.floor(progress * 1.5);
-            document.getElementById('filesFound').textContent = filesCount;
-            document.getElementById('imagesCount').textContent = Math.floor(filesCount * 0.6);
-            document.getElementById('videosCount').textContent = Math.floor(filesCount * 0.3);
-            document.getElementById('audioCount').textContent = Math.floor(filesCount * 0.1);
+            // Actualizar estadísticas con datos reales
+            const totals = scanData.totals || {};
+            document.getElementById('filesFound').textContent = scanData.total_files || 0;
+            document.getElementById('imagesCount').textContent = totals.image || 0;
+            document.getElementById('videosCount').textContent = totals.video || 0;
+            document.getElementById('audioCount').textContent = totals.audio || 0;
 
             if (progress >= 100) {
                 clearInterval(interval);
-                showResults();
+                showResults(scanData);
             }
-        }, 500);
+        }, 300);
     }
 
-    function showResults() {
+    function showResults(scanData) {
         setTimeout(() => {
             progressContainer.style.display = 'none';
             resultsContainer.style.display = 'block';
 
             const resultsSummary = document.getElementById('resultsSummary');
-            const totalFiles = document.getElementById('filesFound').textContent;
-            const images = document.getElementById('imagesCount').textContent;
-            const videos = document.getElementById('videosCount').textContent;
-            const audio = document.getElementById('audioCount').textContent;
+            const totals = scanData.totals || {};
+            const totalFiles = scanData.total_files || 0;
+            const totalSize = formatBytes(scanData.total_size || 0);
 
             resultsSummary.innerHTML = `
                 <div class="alert alert-info">
                     <h5>Resumen del Escaneo</h5>
                     <ul class="mb-0">
+                        <li>Carpeta escaneada: <strong>${scanData.folder_path}</strong></li>
                         <li>Total de archivos encontrados: <strong>${totalFiles}</strong></li>
-                        <li>Imágenes: <strong>${images}</strong></li>
-                        <li>Videos: <strong>${videos}</strong></li>
-                        <li>Audio: <strong>${audio}</strong></li>
+                        <li>Imágenes: <strong>${totals.image || 0}</strong></li>
+                        <li>Videos: <strong>${totals.video || 0}</strong></li>
+                        <li>Audio: <strong>${totals.audio || 0}</strong></li>
+                        <li>Otros: <strong>${totals.other || 0}</strong></li>
+                        <li>Tamaño total: <strong>${totalSize}</strong></li>
                     </ul>
                 </div>
             `;
-        }, 1000);
+        }, 500);
     }
 
-    // Botón examinar (para futuras integraciones)
-    document.getElementById('browseBtn').addEventListener('click', function() {
-        alert('La funcionalidad de explorador de carpetas se implementará en futuras versiones');
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // Botón para guardar resultados
+    document.getElementById('saveResultsBtn').addEventListener('click', async function() {
+        if (!lastScanResults) {
+            alert('No hay resultados de escaneo para guardar');
+            return;
+        }
+
+        const saveBtn = this;
+        const saveStatus = document.getElementById('saveStatus');
+        const saveStatusText = document.getElementById('saveStatusText');
+
+        try {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+            
+            const response = await fetch('/photos/api/save-scan-summary', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(lastScanResults)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al guardar');
+            }
+
+            const data = await response.json();
+            
+            saveStatus.className = 'alert alert-success';
+            saveStatus.style.display = 'block';
+            saveStatusText.textContent = '¡Resumen guardado correctamente! ID: ' + data.summary_id;
+            
+            saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Guardado';
+            saveBtn.className = 'btn btn-success';
+            
+        } catch (error) {
+            console.error('Error:', error);
+            saveStatus.className = 'alert alert-danger';
+            saveStatus.style.display = 'block';
+            saveStatusText.textContent = 'Error al guardar: ' + error.message;
+            
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-save"></i> Guardar Resumen';
+        }
+    });
+
+    // Botón examinar - Abrir modal del explorador de carpetas
+    document.getElementById('browseBtn').addEventListener('click', async function() {
+        // Obtener el directorio home para empezar
+        try {
+            const response = await fetch('/photos/api/get-home-directory');
+            const data = await response.json();
+            currentBrowsePath = data.path;
+            await loadFolders(currentBrowsePath);
+            folderBrowserModal.show();
+        } catch (error) {
+            console.error('Error al obtener directorio home:', error);
+            alert('Error al abrir el explorador de carpetas');
+        }
+    });
+
+    // Cargar carpetas
+    async function loadFolders(path) {
+        const folderList = document.getElementById('folderList');
+        folderList.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
+        
+        try {
+            const response = await fetch('/photos/api/browse-folders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: path})
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al cargar carpetas');
+            }
+
+            const data = await response.json();
+            currentBrowsePath = data.current_path;
+            document.getElementById('currentPathDisplay').value = currentBrowsePath;
+
+            // Renderizar lista de carpetas
+            if (data.directories.length === 0) {
+                folderList.innerHTML = '<p class="text-muted text-center">No hay subcarpetas accesibles</p>';
+            } else {
+                folderList.innerHTML = '';
+                data.directories.forEach(dir => {
+                    const folderItem = document.createElement('div');
+                    folderItem.className = 'folder-item p-2 border-bottom';
+                    folderItem.style.cursor = 'pointer';
+                    folderItem.innerHTML = `
+                        <i class="bi bi-folder-fill text-warning"></i>
+                        <span class="ms-2">${dir.name}</span>
+                    `;
+                    folderItem.addEventListener('click', () => loadFolders(dir.path));
+                    folderItem.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                    });
+                    folderItem.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '';
+                    });
+                    folderList.appendChild(folderItem);
+                });
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            folderList.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+    }
+
+    // Ir al directorio padre
+    document.getElementById('goToParentBtn').addEventListener('click', async function() {
+        if (currentBrowsePath) {
+            const response = await fetch('/photos/api/browse-folders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: currentBrowsePath})
+            });
+            const data = await response.json();
+            if (data.parent_path) {
+                await loadFolders(data.parent_path);
+            }
+        }
+    });
+
+    // Ir al directorio home
+    document.getElementById('goToHomeBtn').addEventListener('click', async function() {
+        const response = await fetch('/photos/api/get-home-directory');
+        const data = await response.json();
+        await loadFolders(data.path);
+    });
+
+    // Seleccionar carpeta actual
+    document.getElementById('selectFolderBtn').addEventListener('click', function() {
+        document.getElementById('folderPath').value = currentBrowsePath;
+        folderBrowserModal.hide();
     });
 });
 </script>

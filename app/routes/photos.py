@@ -1,7 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for
 from app.models.photo_scan_summary import PhotoScanSummary
+from app.models.database import FileType
+from app.services.file_scanner import scan_for_media_recursive
 from app import db
 from datetime import datetime
+from pathlib import Path
 
 bp = Blueprint('photos', __name__, url_prefix='/photos')
 
@@ -19,6 +22,63 @@ def hub():
 def scanner():
     """Página de scanner de archivos multimedia"""
     return render_template('photos/scanner.html')
+
+@bp.route('/api/browse-folders', methods=['POST'])
+def browse_folders():
+    """API endpoint para explorar carpetas del sistema"""
+    import os
+    from pathlib import Path
+    
+    data = request.json
+    current_path = data.get('path', str(Path.home()))
+    
+    try:
+        path_obj = Path(current_path)
+        
+        # Validar que el path existe y es un directorio
+        if not path_obj.exists():
+            return jsonify({'error': 'La ruta no existe'}), 404
+        
+        if not path_obj.is_dir():
+            return jsonify({'error': 'La ruta no es un directorio'}), 400
+        
+        # Obtener directorios
+        directories = []
+        try:
+            for item in sorted(path_obj.iterdir()):
+                if item.is_dir() and not item.name.startswith('.'):
+                    try:
+                        # Verificar si tenemos permisos de lectura
+                        item.stat()
+                        directories.append({
+                            'name': item.name,
+                            'path': str(item),
+                            'parent': str(item.parent)
+                        })
+                    except PermissionError:
+                        # Saltar directorios sin permisos
+                        pass
+        except PermissionError:
+            return jsonify({'error': 'Sin permisos para acceder a esta carpeta'}), 403
+        
+        # Información del directorio actual
+        parent_path = str(path_obj.parent) if path_obj.parent != path_obj else None
+        
+        return jsonify({
+            'current_path': str(path_obj),
+            'parent_path': parent_path,
+            'directories': directories
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error browsing folders: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/get-home-directory', methods=['GET'])
+def get_home_directory():
+    """Obtiene el directorio home del usuario"""
+    from pathlib import Path
+    return jsonify({'path': str(Path.home())})
 
 @bp.route('/scan-summary')
 def scan_summary():
@@ -134,3 +194,112 @@ def delete_scan_summary(id):
     except Exception as e:
         current_app.logger.error(f"Error deleting scan summary: {str(e)}")
         return jsonify({'error': str(e)}), 400
+
+@bp.route('/api/scan-folder', methods=['POST'])
+def scan_folder():
+    """API endpoint para escanear una carpeta y devolver resultados"""
+    data = request.json
+    folder_path = data.get('folder_path')
+    scan_subdirs = data.get('scan_subdirs', True)
+    file_types = data.get('file_types', ['images', 'videos', 'audio'])
+    
+    if not folder_path:
+        return jsonify({'error': 'Se requiere folder_path'}), 400
+    
+    path_obj = Path(folder_path)
+    if not path_obj.exists():
+        return jsonify({'error': 'La ruta no existe'}), 404
+    
+    if not path_obj.is_dir():
+        return jsonify({'error': 'La ruta no es un directorio'}), 400
+    
+    try:
+        # Obtener extensiones de la base de datos
+        image_extensions = set()
+        video_extensions = set()
+        audio_extensions = set()
+        
+        if 'images' in file_types:
+            image_types = FileType.query.filter_by(type='image').all()
+            image_extensions = {ft.extension for ft in image_types}
+        
+        if 'videos' in file_types:
+            video_types = FileType.query.filter_by(type='video').all()
+            video_extensions = {ft.extension for ft in video_types}
+        
+        if 'audio' in file_types:
+            audio_types = FileType.query.filter_by(type='audio').all()
+            audio_extensions = {ft.extension for ft in audio_types}
+        
+        # Ejecutar escaneo
+        scan_results = scan_for_media_recursive(
+            folder_path=str(path_obj),
+            image_extensions=image_extensions,
+            video_extensions=video_extensions,
+            audio_extensions=audio_extensions,
+            scan_subdirs=scan_subdirs
+        )
+        
+        # Calcular totales
+        totals = scan_results.get('totals', {})
+        total_files = sum(totals.values())
+        
+        return jsonify({
+            'status': 'ok',
+            'folder_path': str(path_obj),
+            'totals': totals,
+            'by_extension': scan_results.get('by_extension', {}),
+            'total_files': total_files,
+            'total_size': scan_results.get('total_size', 0),
+            'directories': scan_results.get('directories', [])
+        })
+    
+    except Exception as e:
+        current_app.logger.error(f"Error scanning folder: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/api/save-scan-summary', methods=['POST'])
+def save_scan_summary():
+    """API endpoint para guardar el resumen de un escaneo en la base de datos"""
+    data = request.json
+    
+    folder_path = data.get('folder_path')
+    totals = data.get('totals', {})
+    total_files = data.get('total_files', 0)
+    total_size = data.get('total_size', 0)
+    
+    if not folder_path:
+        return jsonify({'error': 'Se requiere folder_path'}), 400
+    
+    try:
+        # Crear el resumen
+        summary = PhotoScanSummary(
+            path=folder_path,
+            directory=folder_path,
+            directories_count=1,  # Por ahora, podemos mejorar esto después
+            num_images=totals.get('image', 0),
+            num_videos=totals.get('video', 0),
+            total_files=total_files,
+            total_size=total_size,
+            processed_files=total_files,
+            failed_files=0,
+            status='completed',
+            scan_date=datetime.utcnow(),
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(summary)
+        db.session.commit()
+        
+        current_app.logger.info(f'Resumen de escaneo guardado para: {folder_path}')
+        
+        return jsonify({
+            'status': 'ok',
+            'summary_id': summary.id,
+            'message': 'Resumen guardado correctamente'
+        }), 201
+    
+    except Exception as e:
+        current_app.logger.error(f"Error saving scan summary: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
