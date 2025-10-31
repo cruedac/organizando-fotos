@@ -4,6 +4,7 @@ from sqlalchemy import inspect, text
 
 class FileType(db.Model):
     """Modelo para tipos de archivo y sus extensiones"""
+    __tablename__ = 'file_types'
     id = db.Column(db.Integer, primary_key=True)
     extension = db.Column(db.String(10), unique=True, nullable=False)
     type = db.Column(db.String(10), nullable=False)
@@ -251,6 +252,8 @@ class PhotoScanSummary(db.Model):
     directories_count = db.Column(db.Integer, nullable=False, default=0)
     num_images = db.Column(db.Integer, nullable=False, default=0)
     num_videos = db.Column(db.Integer, nullable=False, default=0)
+    num_audio = db.Column(db.Integer, nullable=False, default=0)
+    num_other = db.Column(db.Integer, nullable=False, default=0)
     year = db.Column(db.Integer)
     month_number = db.Column(db.Integer)
     month_text = db.Column(db.String(50))
@@ -265,6 +268,32 @@ class PhotoScanSummary(db.Model):
     failed_files = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='pending')
     details = db.Column(db.Text)
+    
+    # Nuevas columnas para tipos de archivos encontrados
+    file_types_found = db.Column(db.Text)  # JSON string con tipos encontrados
+
+    @property
+    def total_size_formatted(self):
+        """Retorna el tamaño total formateado en la unidad más apropiada."""
+        from app.services.media_metadata import format_size
+        return format_size(self.total_size or 0)
+
+    @property
+    def file_types_list(self):
+        """Retorna la lista de tipos de archivos encontrados."""
+        if not self.file_types_found:
+            return []
+        try:
+            import json
+            return json.loads(self.file_types_found)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    @file_types_list.setter
+    def file_types_list(self, value):
+        """Establece la lista de tipos de archivos encontrados."""
+        import json
+        self.file_types_found = json.dumps(value) if value else None
 
     def to_dict(self):
         """Serializa el modelo a diccionario para JSON"""
@@ -275,15 +304,19 @@ class PhotoScanSummary(db.Model):
             'directories_count': self.directories_count,
             'num_images': self.num_images,
             'num_videos': self.num_videos,
+            'num_audio': self.num_audio or 0,
+            'num_other': self.num_other or 0,
             'year': self.year,
             'month_number': self.month_number,
             'month_text': self.month_text,
             'total_size': self.total_size,
+            'total_size_formatted': self.total_size_formatted,
             'total_files': self.total_files,
             'processed_files': self.processed_files,
             'failed_files': self.failed_files,
             'status': self.status,
             'details': self.details,
+            'file_types_found': self.file_types_list,
             'scan_date': self.scan_date.isoformat() if self.scan_date else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

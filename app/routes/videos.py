@@ -6,7 +6,6 @@ from markupsafe import Markup
 from app.models.movie import Movie
 from app.models.database import TipoSoporte
 from app.services.video import VideoService
-from app.services.video_import import import_sql_file
 from app.services.support_type_cache import get_support_types_cached
 from app import db
 import os
@@ -234,33 +233,6 @@ def index():
                          years=years,
                          current_filters=filters,
                          search_query=search_query)
-
-
-@bp.route('/import-legacy', methods=['POST'])
-def import_legacy():
-    """Ejecuta el SQL legacy (Cintas.sql) manualmente y muestra resultado."""
-    import os
-    # Ejecutar la importación y devolver el resultado
-    count = import_sql_file(app=__import__('flask').current_app)
-    if count:
-        flash(f'Importación legacy completada. INSERTs aproximados: {count}', 'success')
-    else:
-        flash('No se importaron registros (revisa la consola para errores o activa IMPORT_LEGACY_SQL).', 'warning')
-    return redirect(url_for('videos.index'))
-
-@bp.route('/import', methods=['POST'])
-def import_data():
-    """Importa datos desde el archivo SQL"""
-    sql_file = 'imports/Cintas.sql'  # Ruta al archivo SQL
-    
-    success, message = VideoService.import_from_sql(sql_file)
-    
-    if success:
-        flash('Datos importados correctamente', 'success')
-    else:
-        flash(f'Error al importar los datos: {message}', 'error')
-    
-    return redirect(url_for('videos.index'))
 
 @bp.route('/detail/<int:video_id>')
 def detail(video_id):

@@ -531,6 +531,7 @@ def save_scan_summary():
     
     folder_path = data.get('folder_path')
     totals = data.get('totals', {})
+    by_extension = data.get('by_extension', {})
     total_files = data.get('total_files', 0)
     total_size = data.get('total_size', 0)
     
@@ -538,6 +539,15 @@ def save_scan_summary():
         return jsonify({'error': 'Se requiere folder_path'}), 400
     
     try:
+        # Crear lista de tipos de archivos encontrados
+        file_types_found = []
+        for ext, count in by_extension.items():
+            if count > 0:
+                file_types_found.append({
+                    'extension': ext,
+                    'count': count
+                })
+        
         # Crear el resumen
         summary = PhotoScanSummary(
             path=folder_path,
@@ -545,6 +555,8 @@ def save_scan_summary():
             directories_count=1,  # Por ahora, podemos mejorar esto después
             num_images=totals.get('image', 0),
             num_videos=totals.get('video', 0),
+            num_audio=totals.get('audio', 0),
+            num_other=totals.get('other', 0),
             total_files=total_files,
             total_size=total_size,
             processed_files=total_files,
@@ -553,6 +565,9 @@ def save_scan_summary():
             scan_date=datetime.utcnow(),
             created_at=datetime.utcnow()
         )
+        
+        # Asignar tipos de archivos encontrados
+        summary.file_types_list = file_types_found
         
         db.session.add(summary)
         db.session.commit()

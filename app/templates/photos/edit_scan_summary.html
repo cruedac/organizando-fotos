@@ -110,9 +110,15 @@
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="total_size" class="form-label">Tamaño Total (bytes)</label>
-                                <input type="number" class="form-control" id="total_size" name="total_size" 
-                                       value="{{ summary.total_size or 0 }}" min="0">
+                                <label for="total_size" class="form-label">Tamaño Total</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="total_size" name="total_size" 
+                                           value="{{ summary.total_size or 0 }}" min="0">
+                                    <span class="input-group-text bg-light">
+                                        <small class="text-muted">{{ summary.total_size_formatted }}</small>
+                                    </span>
+                                </div>
+                                <small class="text-muted">Tamaño en bytes (se muestra la conversión automáticamente)</small>
                             </div>
                         </div>
                     </div>

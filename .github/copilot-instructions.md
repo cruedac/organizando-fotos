@@ -31,7 +31,6 @@
 - **Video Catalogue**
   - Field definitions for forms/detail views are centralised in `videos.py` (`MOVIE_FIELD_DEFINITIONS`). Any new field must be added there, to the template, and to the `Movie` model.
   - `VideoService.search_videos` composes filters with SQLAlchemy; reuse its helpers (`get_categories`, `get_media_types`, `get_years`) to keep dropdowns synchronized with DB contents.
-  - Legacy imports: `app/services/video_import.py.import_sql_file` rewrites INSERTs to `INSERT OR IGNORE` and emits a JSON report to `data/import_reports/`. Enable by setting `IMPORT_LEGACY_SQL=1` before starting the app; interactive trigger is `/videos/import-legacy`.
 
 - **Maintenance Blueprint**
   - `_get_database_info` compiles live stats using `sqlalchemy.inspect` and drives the dashboard plus `/maintenance/stats.json`. Backup/export actions stream files using `send_file`; prefer returning buffers rather than touching disk when adding formats.

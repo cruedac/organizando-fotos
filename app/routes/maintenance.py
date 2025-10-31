@@ -73,13 +73,14 @@ def _resolve_table_actions(table_name: str) -> dict:
             'has_action': True,
             'label': 'Ver',
             'url': url_for('maintenance.view_table', table_name=table_name),
-            'can_drop': False
+            'can_drop': False,
+            'is_system': True
         }
 
     operational = {
         'movies': 'videos.manage',
         'tipo_soporte': 'maintenance.support_types',
-        'file_type': 'maintenance.file_types'
+        'file_types': 'maintenance.file_types'
     }
 
     if table_name in operational:
@@ -87,7 +88,8 @@ def _resolve_table_actions(table_name: str) -> dict:
             'has_action': True,
             'label': 'Operar',
             'url': url_for(operational[table_name]),
-            'can_drop': True
+            'can_drop': True,
+            'is_system': False
         }
 
     dynamic = DynamicTable.query.filter_by(name=table_name).first()
@@ -96,10 +98,11 @@ def _resolve_table_actions(table_name: str) -> dict:
             'has_action': True,
             'label': 'Operar',
             'url': url_for('tables.manage_records', table_id=dynamic.id),
-            'can_drop': True
+            'can_drop': True,
+            'is_system': False
         }
 
-    return {'has_action': False, 'label': None, 'url': None, 'can_drop': True}
+    return {'has_action': False, 'label': None, 'url': None, 'can_drop': True, 'is_system': False}
 
 
 def _serialize_sql_value(value) -> str:
@@ -180,6 +183,112 @@ def _export_table_csv(table_name: str):
     buffer.seek(0)
     filename = f'{table_name}_{timestamp}.csv'
     return buffer, 'text/csv', filename
+
+
+def _import_table_sql(table_name: str, sql_content: str, replace_existing: bool = False):
+    """Importa datos SQL a una tabla específica."""
+    try:
+        # Verificar que la tabla existe
+        inspector = inspect(db.engine)
+        if table_name not in inspector.get_table_names():
+            return {'success': False, 'message': f'La tabla "{table_name}" no existe.'}
+
+        # Si se solicita reemplazar, limpiar la tabla
+        if replace_existing:
+            with db.engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(text(f'DELETE FROM "{table_name}"'))
+
+        # Ejecutar las sentencias SQL
+        statements = [s.strip() for s in sql_content.split(';') if s.strip() and not s.strip().startswith('--')]
+
+        executed = 0
+        with db.engine.connect() as conn:
+            with conn.begin():
+                for statement in statements:
+                    if statement:
+                        try:
+                            conn.execute(text(statement))
+                            executed += 1
+                        except Exception as stmt_exc:
+                            current_app.logger.warning(f'Error ejecutando statement: {stmt_exc}')
+                            continue
+
+        return {'success': True, 'message': f'{executed} sentencias SQL ejecutadas correctamente.'}
+
+    except Exception as exc:
+        return {'success': False, 'message': f'Error durante la importación: {exc}'}
+
+
+def _import_table_csv(table_name: str, csv_content: str, replace_existing: bool = False):
+    """Importa datos CSV a una tabla específica."""
+    try:
+        # Verificar que la tabla existe
+        inspector = inspect(db.engine)
+        if table_name not in inspector.get_table_names():
+            return {'success': False, 'message': f'La tabla "{table_name}" no existe.'}
+
+        # Obtener información de columnas
+        columns_info = inspector.get_columns(table_name)
+        table_columns = [col['name'] for col in columns_info]
+        current_app.logger.info(f'Columnas de la tabla {table_name}: {table_columns}')
+
+        # Parsear CSV
+        csv_reader = csv.reader(io.StringIO(csv_content))
+        header = next(csv_reader, None)
+
+        if not header:
+            return {'success': False, 'message': 'El archivo CSV no contiene encabezados.'}
+
+        current_app.logger.info(f'Header CSV: {header}')
+
+        # Verificar que las columnas del CSV existen en la tabla
+        missing_columns = set(header) - set(table_columns)
+        if missing_columns:
+            return {'success': False, 'message': f'Columnas no encontradas en la tabla: {", ".join(missing_columns)}'}
+
+        # Si se solicita reemplazar, limpiar la tabla
+        if replace_existing:
+            with db.engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(text(f'DELETE FROM "{table_name}"'))
+                    current_app.logger.info(f'Datos existentes eliminados de {table_name}')
+
+        # Insertar datos
+        inserted = 0
+        errors = 0
+        with db.engine.connect() as conn:
+            with conn.begin():
+                for row_num, row in enumerate(csv_reader, start=2):  # start=2 porque la fila 1 es el header
+                    if len(row) != len(header):
+                        current_app.logger.warning(f'Fila {row_num}: número incorrecto de columnas. Esperado: {len(header)}, Actual: {len(row)}')
+                        continue
+
+                    # Crear diccionario de valores
+                    values = {}
+                    for i, col_name in enumerate(header):
+                        if i < len(row):
+                            values[col_name] = row[i] if row[i] else None
+
+                    # Construir INSERT con named parameters
+                    columns_str = ', '.join(f'"{col}"' for col in values.keys())
+                    placeholders = ', '.join(f':{col}' for col in values.keys())
+                    insert_sql = f'INSERT INTO "{table_name}" ({columns_str}) VALUES ({placeholders})'
+
+                    try:
+                        conn.execute(text(insert_sql), values)
+                        inserted += 1
+                    except Exception as row_exc:
+                        errors += 1
+                        current_app.logger.warning(f'Error insertando fila {row_num}: {row_exc}. Valores: {values}')
+                        continue
+
+        current_app.logger.info(f'Importación CSV completada: {inserted} filas insertadas, {errors} errores')
+        return {'success': True, 'message': f'{inserted} filas importadas correctamente. {errors} errores omitidos.'}
+
+    except Exception as exc:
+        current_app.logger.error(f'Error general en importación CSV: {exc}', exc_info=True)
+        return {'success': False, 'message': f'Error durante la importación: {exc}'}
 
 
 @bp.route('/')
@@ -426,6 +535,68 @@ def export_table():
         return redirect(url_for('maintenance.index'))
 
     return send_file(buffer, mimetype=mimetype, as_attachment=True, download_name=filename)
+
+
+@bp.route('/import-table', methods=['POST'])
+def import_table():
+    """Importa datos a una tabla específica desde archivo SQL o CSV."""
+    table_name = (request.form.get('table_name') or '').strip()
+    replace_existing = request.form.get('replace_existing') == '1'
+
+    if not table_name:
+        flash('Debe seleccionar una tabla para importar.', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    if 'import_file' not in request.files:
+        flash('No se proporcionó ningún archivo para importar.', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    file = request.files['import_file']
+
+    if file.filename == '':
+        flash('No se seleccionó ningún archivo para importar.', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    file_ext = Path(file.filename).suffix.lower()
+
+    if file_ext not in {'.sql', '.txt', '.csv'}:
+        flash('Formato de archivo no soportado. Use .sql, .txt o .csv', 'error')
+        return redirect(url_for('maintenance.index'))
+
+    try:
+        # Leer contenido del archivo
+        content_bytes = file.read()
+
+        if not content_bytes:
+            flash('El archivo de importación está vacío.', 'error')
+            return redirect(url_for('maintenance.index'))
+
+        # Decodificar contenido
+        try:
+            content = content_bytes.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            content = content_bytes.decode('latin-1')
+
+        # Crear backup automático antes de importar
+        backup_path = _create_database_backup()
+        current_app.logger.info(f'Backup creado antes de importar tabla {table_name}: {backup_path}')
+
+        # Importar según el formato
+        if file_ext in {'.sql', '.txt'}:
+            result = _import_table_sql(table_name, content, replace_existing)
+        else:  # .csv
+            result = _import_table_csv(table_name, content, replace_existing)
+
+        if result['success']:
+            flash(f'Datos importados correctamente a la tabla "{table_name}". {result["message"]}', 'success')
+        else:
+            flash(f'Error al importar datos: {result["message"]}', 'error')
+
+    except Exception as exc:
+        current_app.logger.error(f'Error al importar tabla {table_name}: {exc}', exc_info=True)
+        flash(f'Error al importar la tabla: {exc}', 'error')
+
+    return redirect(url_for('maintenance.index'))
 
 
 @bp.route('/import-database', methods=['POST'])

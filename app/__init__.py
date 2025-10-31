@@ -73,12 +73,4 @@ def create_app(config_class=Config):
     FileType.init_db(app)
     init_existing_tables(app)
 
-    # Ejecutar archivo SQL legacy para poblar la base de datos con películas
-    from .services.video_import import import_sql_file
-    import os
-    if os.getenv('IMPORT_LEGACY_SQL', '').lower() in ['1', 'true', 'yes']:
-        import_sql_file(app=app)
-    else:
-        app.logger.info('IMPORT_LEGACY_SQL no activado. Para ejecutar Cintas.sql establece IMPORT_LEGACY_SQL=1 en el entorno.')
-    
     return app

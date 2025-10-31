@@ -31,11 +31,12 @@
 ### FOTOS:
 - Poner una opción que sea "analizar contenido multimedia" y con el archivo seleccionado que vaya a buscar todas las características (metadatos EXIF, dimensiones, etc.)
   * Está a medias
-
+  * En utilidades/analizador si existen datos de GPS y es posible podría incluir la ubicación en google maps indicando donde es
+  
 ### UTILIDADES:
 - Crear una utilidad que obtenga todas las tablas de la base de datos y genere un archivo que pueda ser importado para reiniciar la base de datos
 - Sistema de backup automático programado
-- Exportación a diferentes formatos (CSV, JSON, SQL)
+- Exportación a diferentes formatos (CSV, JSON, SQL) --> Completado
 
 ### FUNCIONALIDADES FUTURAS:
 - Sistema de usuarios y autenticación

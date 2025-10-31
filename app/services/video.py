@@ -2,70 +2,12 @@
 Servicios para la gestión de videos
 """
 
-import os
-import sqlite3
 from app import db
 from app.models.movie import Movie
 from datetime import datetime
-import re
 
 class VideoService:
     """Clase de servicio para la gestión de videos"""
-
-    @staticmethod
-    def import_from_sql(sql_file):
-        """
-        Importa datos desde un archivo SQL que contiene la estructura e información de videos
-        """
-        try:
-            # Leemos el archivo SQL
-            with open(sql_file, 'r', encoding='utf-8') as f:
-                sql_content = f.read()
-
-            # Separamos los comandos SQL individuales
-            # Usamos regex para manejar valores que puedan contener punto y coma
-            commands = re.split(r';(?=(?:[^\']*\'[^\']*\')*[^\']*$)', sql_content)
-            commands = [cmd.strip() for cmd in commands if cmd.strip()]
-
-            # Creamos una conexión temporal a SQLite en memoria
-            conn = sqlite3.connect(':memory:')
-            cursor = conn.cursor()
-
-            # Ejecutamos cada comando SQL
-            for command in commands:
-                if command:
-                    cursor.execute(command)
-                    conn.commit()
-
-            # Importamos los datos a nuestros modelos
-            # Primero las películas
-            cursor.execute('SELECT * FROM movies')
-            columns = [desc[0] for desc in cursor.description]
-            movies_data = cursor.fetchall()
-
-            for movie in movies_data:
-                movie_dict = dict(zip(columns, movie))
-                # Convertimos fechas
-                for date_field in ['DATEADDED', 'DATEWATCHED']:
-                    if movie_dict.get(date_field):
-                        try:
-                            movie_dict[date_field] = datetime.strptime(movie_dict[date_field], '%Y-%m-%d').date()
-                        except ValueError:
-                            movie_dict[date_field] = None
-                
-                # Creamos el registro
-                movie_obj = Movie(**movie_dict)
-                db.session.add(movie_obj)
-
-            # Guardamos todos los cambios
-            db.session.commit()
-            conn.close()
-
-            return True, "Importación completada con éxito"
-
-        except Exception as e:
-            db.session.rollback()
-            return False, f"Error durante la importación: {str(e)}"
     
     @staticmethod
     def search_videos(query, filters=None):

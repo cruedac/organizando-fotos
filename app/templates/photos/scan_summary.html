@@ -55,6 +55,52 @@
                             {{ progress_width }}%
                         </div>
                     </div>
+                    
+                    <!-- Información de archivos por tipo -->
+                    <div class="row text-center mb-3">
+                        <div class="col">
+                            <small class="text-muted">Imágenes</small>
+                            <h6 class="text-primary">{{ summary.num_images or 0 }}</h6>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Videos</small>
+                            <h6 class="text-info">{{ summary.num_videos or 0 }}</h6>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Audio</small>
+                            <h6 class="text-success">{{ summary.num_audio or 0 }}</h6>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Otros</small>
+                            <h6 class="text-secondary">{{ summary.num_other or 0 }}</h6>
+                        </div>
+                    </div>
+                    
+                    <!-- Tamaño total -->
+                    <div class="row mb-3">
+                        <div class="col text-center">
+                            <small class="text-muted">Tamaño Total</small>
+                            <h5 class="text-warning">{{ summary.total_size_formatted }}</h5>
+                        </div>
+                    </div>
+                    
+                    <!-- Tipos de archivos encontrados -->
+                    {% if summary.file_types_list %}
+                    <div class="mb-3">
+                        <small class="text-muted">Tipos de archivos encontrados:</small>
+                        <div class="mt-1">
+                            {% for file_type in summary.file_types_list[:5] %}
+                                <span class="badge bg-light text-dark me-1">
+                                    {{ file_type.extension }}: {{ file_type.count }}
+                                </span>
+                            {% endfor %}
+                            {% if summary.file_types_list|length > 5 %}
+                                <span class="badge bg-secondary">+{{ summary.file_types_list|length - 5 }} más</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     <div class="row text-center">
                         <div class="col">
                             <small>Total</small>
