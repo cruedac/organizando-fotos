@@ -1,7 +1,8 @@
 """
 Rutas para la gestión de videos
 """
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, Markup, current_app
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
+from markupsafe import Markup
 from app.models.movie import Movie
 from app.models.database import TipoSoporte
 from app.services.video import VideoService

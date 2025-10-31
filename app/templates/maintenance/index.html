@@ -79,7 +79,169 @@
             </div>
         </div>
         
+        <!-- Sección: Importar Base de Datos -->
+        <div class="card my-4 border-primary">
+            <div class="card-header bg-primary bg-opacity-10">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-upload"></i>
+                    Importar Base de Datos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="fw-bold">Importar datos desde archivo</h6>
+                        <p class="text-muted mb-2">
+                            Importa datos desde un archivo SQL o JSON previamente exportado.
+                            Los datos se agregarán a las tablas existentes.
+                        </p>
+                        <ul class="small text-muted mb-0">
+                            <li>Formatos soportados: SQL (.sql) y JSON (.json)</li>
+                            <li>Se crea un backup automático antes de importar</li>
+                            <li>Los registros duplicados se pueden omitir o reemplazar</li>
+                            <li>Solo se importan tablas que existen en la BD actual</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4 text-md-end d-flex align-items-center justify-content-md-end">
+                        <button type="button" 
+                                class="btn btn-primary" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#importDatabaseModal">
+                            <i class="bi bi-upload"></i>
+                            Importar Base de Datos
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
+        <!-- Sección: Gestión de Base de Datos -->
+        <div class="card my-4 border-warning">
+            <div class="card-header bg-warning bg-opacity-10">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-database-exclamation"></i>
+                    Gestión de Base de Datos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning mb-3" role="alert">
+                    <strong><i class="bi bi-exclamation-triangle-fill"></i> Zona de Alto Riesgo</strong><br>
+                    Las operaciones en esta sección pueden resultar en pérdida permanente de datos.
+                    Procede con extrema precaución.
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="fw-bold">Resetear Base de Datos</h6>
+                        <p class="text-muted mb-2">
+                            Elimina todas las tablas y recrea la estructura de la base de datos desde cero.
+                            Útil para resolver problemas de corrupción o para empezar de nuevo.
+                        </p>
+                        <ul class="small text-muted mb-0">
+                            <li>Se crea automáticamente un backup antes de proceder</li>
+                            <li>Todas las tablas serán eliminadas y recreadas</li>
+                            <li>Los datos iniciales (extensiones, tipos de soporte) se pueden repoblar</li>
+                            <li>Los datos de usuario (películas, escaneos) se perderán</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4 text-md-end d-flex align-items-center justify-content-md-end">
+                        <button type="button" 
+                                class="btn btn-danger" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#resetDatabaseModal">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            Resetear Base de Datos
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        
+    </div>
+</div>
+
+<!-- Modal: Reset Database -->
+<div class="modal fade" id="resetDatabaseModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Confirmar Reset de Base de Datos
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger" role="alert">
+                    <strong>¡ADVERTENCIA DE PÉRDIDA DE DATOS!</strong><br>
+                    Esta operación eliminará <strong>TODOS</strong> los datos de la base de datos, incluyendo:
+                    <ul class="mb-0 mt-2">
+                        <li>Catálogo completo de películas/videos</li>
+                        <li>Historial de escaneos de fotos</li>
+                        <li>Tablas dinámicas creadas por el usuario</li>
+                        <li>Todos los registros de todas las tablas</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="createBackupCheck" checked>
+                        <label class="form-check-label fw-bold" for="createBackupCheck">
+                            Crear backup automático antes de resetear
+                        </label>
+                        <div class="form-text">
+                            Recomendado. El backup se guardará en la carpeta <code>data/backup/</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="seedDataCheck" checked>
+                        <label class="form-check-label fw-bold" for="seedDataCheck">
+                            Poblar datos iniciales (extensiones, tipos de soporte)
+                        </label>
+                        <div class="form-text">
+                            Recomendado. Carga las extensiones de archivo y tipos de soporte predefinidos.
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label for="confirmationInput" class="form-label fw-bold">
+                        Para confirmar, escribe <code>CONFIRMAR</code> en el campo a continuación:
+                    </label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="confirmationInput" 
+                           placeholder="Escribe CONFIRMAR"
+                           autocomplete="off">
+                </div>
+                
+                <div id="resetProgress" class="d-none">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">Procesando...</span>
+                        </div>
+                        <span>Reseteando base de datos, por favor espera...</span>
+                    </div>
+                </div>
+                
+                <div id="resetResult" class="d-none mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="resetCancelBtn">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmResetBtn" disabled>
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Sí, Resetear Base de Datos
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -173,6 +335,445 @@ document.addEventListener('DOMContentLoaded', function () {
             if (defaultOption) {
                 defaultOption.checked = true;
             }
+        });
+    }
+    
+    // === RESET DATABASE MODAL LOGIC ===
+    const resetModal = document.getElementById('resetDatabaseModal');
+    const confirmationInput = document.getElementById('confirmationInput');
+    const confirmResetBtn = document.getElementById('confirmResetBtn');
+    const resetProgress = document.getElementById('resetProgress');
+    const resetResult = document.getElementById('resetResult');
+    const resetCancelBtn = document.getElementById('resetCancelBtn');
+    const createBackupCheck = document.getElementById('createBackupCheck');
+    const seedDataCheck = document.getElementById('seedDataCheck');
+    
+    if (resetModal && confirmationInput && confirmResetBtn) {
+        // Habilitar botón solo si se escribe "CONFIRMAR"
+        confirmationInput.addEventListener('input', function() {
+            const isValid = this.value.trim() === 'CONFIRMAR';
+            confirmResetBtn.disabled = !isValid;
+        });
+        
+        // Resetear estado del modal al abrirse
+        resetModal.addEventListener('show.bs.modal', function() {
+            confirmationInput.value = '';
+            confirmResetBtn.disabled = true;
+            resetProgress.classList.add('d-none');
+            resetResult.classList.add('d-none');
+            resetResult.innerHTML = '';
+            resetCancelBtn.disabled = false;
+            confirmResetBtn.classList.remove('d-none');
+            createBackupCheck.disabled = false;
+            seedDataCheck.disabled = false;
+        });
+        
+        // Manejar clic en botón de confirmación
+        confirmResetBtn.addEventListener('click', async function() {
+            if (confirmationInput.value.trim() !== 'CONFIRMAR') {
+                return;
+            }
+            
+            // Deshabilitar controles
+            confirmResetBtn.disabled = true;
+            resetCancelBtn.disabled = true;
+            confirmationInput.disabled = true;
+            createBackupCheck.disabled = true;
+            seedDataCheck.disabled = true;
+            
+            // Mostrar progreso
+            resetProgress.classList.remove('d-none');
+            resetResult.classList.add('d-none');
+            
+            try {
+                const response = await fetch('{{ url_for("maintenance.reset_database") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        confirm: 'CONFIRMAR',
+                        skip_backup: !createBackupCheck.checked,
+                        seed_data: seedDataCheck.checked
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Ocultar progreso
+                resetProgress.classList.add('d-none');
+                
+                // Mostrar resultado
+                resetResult.classList.remove('d-none');
+                
+                if (data.success) {
+                    let resultHtml = `
+                        <div class="alert alert-success" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-check-circle-fill"></i>
+                                ¡Base de datos reseteada exitosamente!
+                            </h6>
+                            <p class="mb-0">${data.message}</p>
+                    `;
+                    
+                    if (data.backup_path) {
+                        resultHtml += `
+                            <hr>
+                            <p class="mb-0">
+                                <strong>Backup creado en:</strong><br>
+                                <code>${data.backup_path}</code>
+                            </p>
+                        `;
+                    }
+                    
+                    if (data.tables_created && data.tables_created.length > 0) {
+                        resultHtml += `
+                            <hr>
+                            <p class="mb-1"><strong>Tablas creadas:</strong></p>
+                            <ul class="mb-0">
+                                ${data.tables_created.map(t => `<li><code>${t}</code></li>`).join('')}
+                            </ul>
+                        `;
+                    }
+                    
+                    resultHtml += '</div>';
+                    resultHtml += `
+                        <div class="alert alert-info" role="alert">
+                            <i class="bi bi-info-circle-fill"></i>
+                            La página se recargará en 3 segundos...
+                        </div>
+                    `;
+                    
+                    resetResult.innerHTML = resultHtml;
+                    
+                    // Ocultar botón de confirmar, mostrar solo cancelar (para cerrar)
+                    confirmResetBtn.classList.add('d-none');
+                    resetCancelBtn.disabled = false;
+                    resetCancelBtn.textContent = 'Cerrar';
+                    
+                    // Recargar la página después de 3 segundos
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                    
+                } else {
+                    let errorHtml = `
+                        <div class="alert alert-danger" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-x-circle-fill"></i>
+                                Error al resetear la base de datos
+                            </h6>
+                            <p>${data.message}</p>
+                    `;
+                    
+                    if (data.error) {
+                        errorHtml += `
+                            <hr>
+                            <p class="mb-1"><strong>Detalles del error:</strong></p>
+                            <pre class="mb-0 small" style="max-height: 200px; overflow-y: auto;">${data.error}</pre>
+                        `;
+                    }
+                    
+                    errorHtml += '</div>';
+                    
+                    resetResult.innerHTML = errorHtml;
+                    
+                    // Reactivar controles para reintentar
+                    confirmResetBtn.disabled = false;
+                    resetCancelBtn.disabled = false;
+                    confirmationInput.disabled = false;
+                    createBackupCheck.disabled = false;
+                    seedDataCheck.disabled = false;
+                }
+                
+            } catch (error) {
+                resetProgress.classList.add('d-none');
+                resetResult.classList.remove('d-none');
+                resetResult.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-x-circle-fill"></i>
+                            Error de conexión
+                        </h6>
+                        <p class="mb-0">No se pudo conectar con el servidor: ${error.message}</p>
+                    </div>
+                `;
+                
+                // Reactivar controles
+                confirmResetBtn.disabled = false;
+                resetCancelBtn.disabled = false;
+                confirmationInput.disabled = false;
+                createBackupCheck.disabled = false;
+                seedDataCheck.disabled = false;
+            }
+        });
+    }
+});
+</script>
+
+<!-- Modal: Import Database -->
+<div class="modal fade" id="importDatabaseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-upload"></i>
+                    Importar Base de Datos
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importDatabaseForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="importFile" class="form-label fw-bold">Seleccionar archivo</label>
+                        <input type="file" 
+                               class="form-control" 
+                               id="importFile" 
+                               name="file" 
+                               required>
+                        <div class="form-text">
+                            Soporta archivos SQL o JSON. La detección de formato se realiza automáticamente.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="createBackupImport" name="create_backup" checked>
+                            <label class="form-check-label fw-bold" for="createBackupImport">
+                                Crear backup antes de importar
+                            </label>
+                            <div class="form-text">
+                                Recomendado. El backup se guardará en <code>data/backup/</code>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="replaceExisting" name="replace_existing">
+                            <label class="form-check-label fw-bold" for="replaceExisting">
+                                Reemplazar registros existentes
+                            </label>
+                            <div class="form-text">
+                                Si está marcado, los registros duplicados se reemplazarán. Si no, se omitirán.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="importProgress" class="d-none">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                <span class="visually-hidden">Importando...</span>
+                            </div>
+                            <span>Importando datos, por favor espera...</span>
+                        </div>
+                    </div>
+                    
+                    <div id="importResult" class="d-none mt-3"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="importCancelBtn">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="importConfirmBtn">
+                    <i class="bi bi-upload"></i>
+                    Importar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Importar Base de Datos
+document.addEventListener('DOMContentLoaded', function() {
+    const importModal = document.getElementById('importDatabaseModal');
+    const importForm = document.getElementById('importDatabaseForm');
+    const importFileInput = document.getElementById('importFile');
+    const importConfirmBtn = document.getElementById('importConfirmBtn');
+    const importCancelBtn = document.getElementById('importCancelBtn');
+    const importProgress = document.getElementById('importProgress');
+    const importResult = document.getElementById('importResult');
+    
+    if (importConfirmBtn) {
+        importConfirmBtn.addEventListener('click', async function() {
+            const file = importFileInput.files[0];
+            
+            if (!file) {
+                alert('Por favor selecciona un archivo');
+                return;
+            }
+            
+            // Confirmar acción
+            if (!confirm('¿Estás seguro de que deseas importar datos desde este archivo? Esto puede modificar la base de datos actual.')) {
+                return;
+            }
+            
+            let formData;
+            try {
+                formData = new FormData(importForm);
+                formData.set('create_backup', document.getElementById('createBackupImport').checked ? 'true' : 'false');
+                formData.set('replace_existing', document.getElementById('replaceExisting').checked ? 'true' : 'false');
+            } catch (err) {
+                alert('No se pudo leer el formulario de importación. Intenta de nuevo.');
+                return;
+            }
+
+            // Deshabilitar controles después de capturar los datos
+            importConfirmBtn.disabled = true;
+            importCancelBtn.disabled = true;
+            importFileInput.disabled = true;
+            document.getElementById('createBackupImport').disabled = true;
+            document.getElementById('replaceExisting').disabled = true;
+
+            // Mostrar spinner
+            importProgress.classList.remove('d-none');
+            importResult.classList.add('d-none');
+
+            try {
+                
+                const response = await fetch('/maintenance/import-database', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Ocultar spinner
+                importProgress.classList.add('d-none');
+                importResult.classList.remove('d-none');
+                
+                if (response.ok && data.success) {
+                    // Éxito
+                    let successHtml = `
+                        <div class="alert alert-success" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-check-circle-fill"></i>
+                                Importación completada exitosamente
+                            </h6>
+                            <p>${data.message}</p>
+                    `;
+                    
+                    if (data.details) {
+                        successHtml += '<hr><p class="mb-1"><strong>Detalles:</strong></p><ul class="mb-0">';
+                        
+                        if (data.details.executed !== undefined) {
+                            successHtml += `<li>Sentencias ejecutadas: ${data.details.executed}</li>`;
+                            successHtml += `<li>Sentencias omitidas: ${data.details.skipped}</li>`;
+                        }
+                        
+                        if (data.details.imported_tables !== undefined) {
+                            successHtml += `<li>Tablas importadas: ${data.details.imported_tables}</li>`;
+                            successHtml += `<li>Registros importados: ${data.details.imported_records}</li>`;
+                            successHtml += `<li>Registros omitidos: ${data.details.skipped_records}</li>`;
+                        }
+
+                        
+                        if (data.details.format_used) {
+                            const formatLabel = String(data.details.format_used).toUpperCase();
+                            successHtml += `<li>Formato detectado: ${formatLabel}</li>`;
+                        }
+
+                        if (data.details.bytes_written !== undefined) {
+                            successHtml += `<li>Bytes importados: ${data.details.bytes_written}</li>`;
+                        }
+
+                        if (data.details.tables_detected !== undefined) {
+                            successHtml += `<li>Tablas detectadas: ${data.details.tables_detected}</li>`;
+                        }
+
+                        if (data.details.destination) {
+                            successHtml += `<li>Archivo destino: <code>${data.details.destination}</code></li>`;
+                        }
+
+                        if (data.details.full_replace) {
+                            successHtml += '<li>Reemplazo completo de la base de datos realizado.</li>';
+                        }
+                        
+                        if (data.details.errors && data.details.errors.length > 0) {
+                            successHtml += `<li class="text-warning">Errores: ${data.details.errors.length}</li>`;
+                        }
+                        
+                        successHtml += '</ul>';
+                    }
+                    
+                    successHtml += `
+                        <hr>
+                        <p class="mb-0">
+                            <button type="button" class="btn btn-sm btn-success" onclick="window.location.reload()">
+                                Recargar página
+                            </button>
+                        </p>
+                    </div>
+                    `;
+                    
+                    importResult.innerHTML = successHtml;
+                    
+                    // Cerrar modal automáticamente después de 3 segundos
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                } else {
+                    // Error
+                    let errorHtml = `
+                        <div class="alert alert-danger" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-x-circle-fill"></i>
+                                Error al importar
+                            </h6>
+                            <p>${data.error || data.message || 'Error desconocido'}</p>
+                    `;
+                    
+                    if (data.details && data.details.errors) {
+                        errorHtml += '<hr><p class="mb-1"><strong>Errores:</strong></p>';
+                        errorHtml += '<pre class="mb-0 small" style="max-height: 200px; overflow-y: auto;">';
+                        errorHtml += data.details.errors.join('\n');
+                        errorHtml += '</pre>';
+                    }
+                    
+                    errorHtml += '</div>';
+                    importResult.innerHTML = errorHtml;
+                    
+                    // Reactivar controles
+                    importConfirmBtn.disabled = false;
+                    importCancelBtn.disabled = false;
+                    importFileInput.disabled = false;
+                    document.getElementById('createBackupImport').disabled = false;
+                    document.getElementById('replaceExisting').disabled = false;
+                }
+            } catch (error) {
+                importProgress.classList.add('d-none');
+                importResult.classList.remove('d-none');
+                importResult.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-x-circle-fill"></i>
+                            Error de conexión
+                        </h6>
+                        <p>No se pudo comunicar con el servidor: ${error.message}</p>
+                    </div>
+                `;
+                
+                // Reactivar controles
+                importConfirmBtn.disabled = false;
+                importCancelBtn.disabled = false;
+                importFileInput.disabled = false;
+                document.getElementById('createBackupImport').disabled = false;
+                document.getElementById('replaceExisting').disabled = false;
+            }
+        });
+    }
+    
+    // Resetear formulario cuando se cierra el modal
+    if (importModal) {
+        importModal.addEventListener('hidden.bs.modal', function() {
+            importForm.reset();
+            importProgress.classList.add('d-none');
+            importResult.classList.add('d-none');
+            importConfirmBtn.disabled = false;
+            importCancelBtn.disabled = false;
+            importFileInput.disabled = false;
+            document.getElementById('createBackupImport').disabled = false;
+            document.getElementById('replaceExisting').disabled = false;
         });
     }
 });

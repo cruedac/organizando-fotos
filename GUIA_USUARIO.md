@@ -612,7 +612,254 @@ Crea una copia del archivo de base de datos SQLite.
 2. Click en botón de exportación
 3. Se descarga el archivo automáticamente
 
-#### 6. Estadísticas en JSON
+#### 6. Reseteo de Base de Datos
+
+**Acceso:** Mantenimiento > Gestión de Base de Datos
+
+**⚠️ ADVERTENCIA: Operación de Alto Riesgo**
+
+**¿Qué hace?**
+Elimina completamente todas las tablas y recrea la estructura de la base de datos desde cero.
+
+**¿Cuándo usar esta función?**
+
+✅ **Casos de uso apropiados:**
+- Base de datos corrupta que no funciona correctamente
+- Errores persistentes en la estructura de tablas
+- Necesitas empezar completamente de nuevo
+- Migración/actualización mayor de la estructura
+- Desarrollo y pruebas (entornos no productivos)
+
+❌ **NO usar si:**
+- Solo quieres limpiar algunos datos (usa exportar/importar selectivo)
+- Tienes dudas sobre el proceso
+- No has creado un backup reciente
+- Estás en un entorno de producción sin plan de recuperación
+
+**Proceso paso a paso:**
+
+**1. Preparación (antes de resetear):**
+```bash
+# Opcional pero ALTAMENTE recomendado:
+# Exporta las tablas que quieras preservar
+```
+
+1. Ve a Mantenimiento > Inicio
+2. Para cada tabla importante:
+   - Click en **"Exportar"**
+   - Selecciona formato **SQL** o **CSV**
+   - Guarda el archivo de exportación
+
+**2. Ejecutar Reset:**
+
+1. Ve a **Mantenimiento > Gestión de Base de Datos**
+2. Click en botón **"Resetear Base de Datos"** (botón rojo)
+3. Aparece modal de confirmación con opciones:
+
+**Opciones disponibles:**
+
+- ☑️ **Crear backup automático antes de resetear**
+  - **Recomendado:** SIEMPRE activado
+  - Se guarda en `data/backup/multimedia_before_init_YYYYMMDD_HHMMSS.db`
+  - Backup completo de la BD antes de proceder
+  
+- ☑️ **Poblar datos iniciales**
+  - **Recomendado:** Activado (a menos que tengas razón específica)
+  - Carga extensiones de archivo predefinidas (jpg, png, mp4, etc.)
+  - Carga tipos de soporte (DVD, Blu-ray, Digital, etc.)
+  - Sin esto, tendrás que agregar manualmente cada extensión
+
+**3. Confirmación:**
+
+1. Lee las advertencias cuidadosamente
+2. Escribe **`CONFIRMAR`** (en mayúsculas) en el campo de texto
+3. Click en **"Sí, Resetear Base de Datos"**
+
+**4. Proceso:**
+- Se muestra spinner "Reseteando base de datos..."
+- Tiempo estimado: 5-30 segundos
+- La página se recargará automáticamente al completar
+
+**5. Resultado:**
+
+**✅ Éxito:**
+- Mensaje de confirmación verde
+- Lista de tablas creadas
+- Ruta del backup (si se creó)
+- Página se recarga en 3 segundos
+
+**❌ Error:**
+- Mensaje de error rojo
+- Detalles del problema
+- Opción de reintentar
+- Backup sigue disponible si se creó
+
+**¿Qué se elimina?**
+
+🗑️ **TODO lo siguiente se pierde (a menos que tengas backup):**
+- ❌ Catálogo completo de películas/videos
+- ❌ Historial de escaneos de fotos
+- ❌ Tablas dinámicas creadas por el usuario (y sus datos)
+- ❌ Configuraciones personalizadas de tipos de archivo/soporte
+- ❌ Todos los registros de todas las tablas
+
+✅ **Lo que se conserva/recrea:**
+- ✅ Estructura de tablas del sistema (recreada desde esquemas)
+- ✅ Extensiones de archivo predefinidas (si "Poblar datos" activado)
+- ✅ Tipos de soporte predefinidos (si "Poblar datos" activado)
+- ✅ Backup de los datos originales (en `data/backup/`)
+
+**Restauración desde Backup:**
+
+**Opción A: Restauración completa (recomendado si algo salió mal)**
+
+```bash
+# Detener la aplicación
+# Ubicar el backup en data/backup/
+
+# Windows PowerShell:
+Copy-Item "data\backup\multimedia_before_init_FECHA.db" "data\multimedia.db" -Force
+
+# Linux/Mac:
+cp data/backup/multimedia_before_init_FECHA.db data/multimedia.db
+
+# Reiniciar la aplicación
+```
+
+**Opción B: Recuperación selectiva de datos**
+
+Si el reset fue exitoso pero quieres recuperar algunos datos del backup:
+
+1. **Conectar al backup desde línea de comandos:**
+```bash
+# SQLite CLI
+sqlite3 data/backup/multimedia_before_init_FECHA.db
+
+# Ver tablas disponibles
+.tables
+
+# Exportar una tabla específica
+.mode insert movies
+.output movies_backup.sql
+SELECT * FROM movies;
+.quit
+```
+
+2. **Importar datos a la nueva BD:**
+```bash
+sqlite3 data/multimedia.db < movies_backup.sql
+```
+
+**Alternativa con herramienta visual:**
+- Usa [DB Browser for SQLite](https://sqlitebrowser.org/)
+- Abre ambas bases de datos (nueva y backup)
+- Exporta/importa las tablas que necesites
+
+**Verificación post-reset:**
+
+Después de resetear, verifica:
+
+1. **Tablas creadas correctamente:**
+   - Ve a Mantenimiento > Inicio
+   - Verifica que todas las tablas del sistema están presentes:
+     - `file_types`
+     - `movies`
+     - `tipo_soporte`
+     - `photos_scan`
+     - `photos_scan_summary`
+     - `dynamic_table`
+     - `table_field`
+
+2. **Datos iniciales poblados (si activaste la opción):**
+   - Ve a Mantenimiento > Tipos de Archivo
+   - Debe haber extensiones: jpg, png, mp4, etc.
+   - Ve a Mantenimiento > Tipos de Soporte
+   - Debe haber tipos: DVD, Blu-ray, Digital, etc.
+
+3. **Funcionalidad básica:**
+   - Prueba escanear una carpeta de fotos
+   - Prueba agregar un video manualmente
+   - Verifica que no hay errores en logs
+
+**Escenarios comunes:**
+
+**Escenario 1: "Tengo error 'table has no column' recurrente"**
+```
+✅ Solución: Reset con "Poblar datos" activado
+- El reset recrea todas las tablas con la estructura correcta
+- Asegura que columnas faltantes estén presentes
+```
+
+**Escenario 2: "Quiero empezar de nuevo pero conservar mis películas"**
+```
+1. Exporta tabla 'movies' a SQL antes de resetear
+2. Ejecuta reset con backup automático activado
+3. Importa el archivo movies.sql después del reset
+```
+
+**Escenario 3: "¿El reset arregla mi base de datos corrupta?"**
+```
+✅ Sí, pero:
+- Solo si el archivo .db no está físicamente dañado
+- Si el problema es estructura incorrecta → reset lo soluciona
+- Si el problema es disco duro fallando → reset no ayuda
+```
+
+**Preguntas frecuentes:**
+
+**Q: ¿Puedo deshacer el reset?**
+A: Sí, si creaste el backup automático. Simplemente reemplaza `data/multimedia.db` con el archivo de backup.
+
+**Q: ¿El reset afecta mis archivos de fotos/videos originales?**
+A: No. El reset solo afecta la base de datos SQLite. Tus archivos multimedia en disco no se tocan.
+
+**Q: ¿Cuánto espacio ocupa el backup?**
+A: El mismo tamaño que tu base de datos actual. Verifica el tamaño en Mantenimiento > Inicio.
+
+**Q: ¿Puedo automatizar el reset con un script?**
+A: Sí, usando el script de línea de comandos:
+```bash
+python database/init_database.py --drop --seed
+```
+
+**Q: ¿Qué pasa con las tablas dinámicas que creé?**
+A: Se pierden completamente. Exporta su estructura antes del reset si las necesitas.
+
+**Q: ¿Se puede resetear solo una tabla específica?**
+A: No desde la UI. El reset es completo. Para operaciones selectivas, usa DROP TABLE manual desde CLI.
+
+**Soporte técnico:**
+
+Si algo sale mal durante el reset:
+
+1. **No entres en pánico** - tu backup está en `data/backup/`
+2. **Revisa los logs** en `logs/app.log`
+3. **Copia el mensaje de error** completo
+4. **Restaura desde backup** si es crítico
+5. **Reporta el issue** en GitHub con:
+   - Sistema operativo
+   - Versión de Python
+   - Mensaje de error
+   - Últimas líneas del log
+
+**Comandos útiles para diagnóstico:**
+
+```bash
+# Ver estructura de la BD actual
+sqlite3 data/multimedia.db ".schema"
+
+# Verificar integridad de la BD
+sqlite3 data/multimedia.db "PRAGMA integrity_check;"
+
+# Listar backups disponibles
+# Windows:
+Get-ChildItem data\backup\*.db | Sort-Object LastWriteTime -Descending
+
+# Linux:
+ls -lth data/backup/*.db
+```
+
+#### 7. Estadísticas en JSON
 
 **Acceso:** `/maintenance/stats.json` (API endpoint)
 

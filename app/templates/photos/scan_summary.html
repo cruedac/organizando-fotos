@@ -35,13 +35,21 @@
         <div class="col-md-6 mb-4">
             <div class="card scan-card" data-id="{{ summary.id }}">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span class="status-badge status-{{ summary.status }}">{{ summary.status|title }}</span>
-                    <small>{{ summary.scan_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                    <span class="status-badge status-{{ summary.status or 'unknown' }}">{{ (summary.status or 'Desconocido')|title }}</span>
+                    <small>
+                        {% if summary.scan_date %}
+                            {{ summary.scan_date.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            Sin fecha
+                        {% endif %}
+                    </small>
                 </div>
                 <div class="card-body">
-                    <h5 class="card-title">{{ summary.directory }}</h5>
+                    <h5 class="card-title">{{ summary.directory or 'Sin directorio' }}</h5>
                     <div class="progress mb-3">
-                        {% set progress = (summary.processed_files / summary.total_files * 100) if summary.total_files > 0 else 0 %}
+                        {% set total = summary.total_files or 0 %}
+                        {% set processed = summary.processed_files or 0 %}
+                        {% set progress = (processed / total * 100) if total > 0 else 0 %}
                         {% set progress_width = "%.1f"|format(progress) %}
                         <div class="progress-bar" role="progressbar" style="width: {{ progress_width }}%">
                             {{ progress_width }}%
@@ -50,15 +58,15 @@
                     <div class="row text-center">
                         <div class="col">
                             <small>Total</small>
-                            <h6>{{ summary.total_files }}</h6>
+                            <h6>{{ summary.total_files or 0 }}</h6>
                         </div>
                         <div class="col">
                             <small>Procesados</small>
-                            <h6>{{ summary.processed_files }}</h6>
+                            <h6>{{ summary.processed_files or 0 }}</h6>
                         </div>
                         <div class="col">
                             <small>Fallidos</small>
-                            <h6>{{ summary.failed_files }}</h6>
+                            <h6>{{ summary.failed_files or 0 }}</h6>
                         </div>
                     </div>
                 </div>

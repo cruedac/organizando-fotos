@@ -16,7 +16,7 @@ def migrate_photos_scan_summary():
     # Verificar si la tabla existe
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='photos_scan_summary'")
     if not cursor.fetchone():
-        print("❌ La tabla photos_scan_summary no existe")
+        print("[ERROR] La tabla photos_scan_summary no existe")
         conn.close()
         return
     
@@ -44,27 +44,27 @@ def migrate_photos_scan_summary():
                 sql = f"ALTER TABLE photos_scan_summary ADD COLUMN {column_name} {column_type}"
                 print(f"Ejecutando: {sql}")
                 cursor.execute(sql)
-                print(f"✅ Columna '{column_name}' añadida correctamente")
+                print(f"[OK] Columna '{column_name}' anadida correctamente")
                 changes_made = True
             except sqlite3.OperationalError as e:
-                print(f"⚠️  Error al añadir columna '{column_name}': {e}")
+                print(f"[WARNING] Error al anadir columna '{column_name}': {e}")
         else:
-            print(f"ℹ️  Columna '{column_name}' ya existe")
+            print(f"[INFO] Columna '{column_name}' ya existe")
     
     if changes_made:
         conn.commit()
-        print("\n✅ Migración completada exitosamente")
+        print("\n[OK] Migracion completada exitosamente")
     else:
-        print("\nℹ️  No se requirieron cambios")
+        print("\n[INFO] No se requirieron cambios")
     
     # Verificar estructura final
     cursor.execute("PRAGMA table_info(photos_scan_summary)")
-    print("\n📋 Estructura final de la tabla:")
+    print("\n[INFO] Estructura final de la tabla:")
     for row in cursor.fetchall():
         print(f"  - {row[1]} ({row[2]})")
     
     conn.close()
 
 if __name__ == '__main__':
-    print("🔧 Iniciando migración de photos_scan_summary...\n")
+    print("[INFO] Iniciando migracion de photos_scan_summary...\n")
     migrate_photos_scan_summary()

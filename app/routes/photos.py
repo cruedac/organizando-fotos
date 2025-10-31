@@ -1,10 +1,13 @@
-from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for
-from app.models.photo_scan_summary import PhotoScanSummary
-from app.models.database import FileType
+from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for, Response
+from app.models.database import PhotoScanSummary, FileType
 from app.services.file_scanner import scan_for_media_recursive
 from app import db
 from datetime import datetime
 from pathlib import Path
+import threading
+import queue
+import time
+import json
 
 bp = Blueprint('photos', __name__, url_prefix='/photos')
 
@@ -344,6 +347,182 @@ def scan_folder():
     except Exception as e:
         current_app.logger.error(f"Error scanning folder: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+# Variable global para almacenar el estado del escaneo actual
+_scan_progress = {
+    'queue': None,
+    'active': False,
+    'results': None
+}
+
+
+@bp.route('/api/scan-progress')
+def scan_progress():
+    """SSE endpoint para progreso en tiempo real del escaneo"""
+    def generate():
+        # Enviar heartbeat inicial
+        yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+        
+        if not _scan_progress['active']:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'No hay escaneo activo'})}\n\n"
+            return
+        
+        q = _scan_progress['queue']
+        last_heartbeat = time.time()
+        
+        while True:
+            try:
+                # Enviar heartbeat cada 5 segundos para mantener conexión viva
+                if time.time() - last_heartbeat > 5:
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                    last_heartbeat = time.time()
+                
+                # Intentar obtener mensaje de la cola (timeout 1 segundo)
+                try:
+                    message = q.get(timeout=1)
+                except queue.Empty:
+                    continue
+                
+                yield f"data: {json.dumps(message)}\n\n"
+                
+                # Si es mensaje de finalización, terminar
+                if message.get('type') in ['complete', 'error']:
+                    break
+                    
+            except GeneratorExit:
+                break
+    
+    return Response(generate(), mimetype='text/event-stream')
+
+
+@bp.route('/api/scan-folder-async', methods=['POST'])
+def scan_folder_async():
+    """Inicia un escaneo asíncrono con progreso en tiempo real"""
+    data = request.json
+    folder_path = data.get('folder_path')
+    scan_subdirs = data.get('scan_subdirs', True)
+    file_types = data.get('file_types', ['images', 'videos', 'audio'])
+    
+    if not folder_path:
+        return jsonify({'error': 'Se requiere folder_path'}), 400
+    
+    path_obj = Path(folder_path)
+    if not path_obj.exists():
+        return jsonify({'error': 'La ruta no existe'}), 404
+    
+    if not path_obj.is_dir():
+        return jsonify({'error': 'La ruta no es un directorio'}), 400
+    
+    # Verificar si ya hay un escaneo activo
+    if _scan_progress['active']:
+        return jsonify({'error': 'Ya hay un escaneo en progreso'}), 409
+    
+    # Crear nueva cola para este escaneo
+    _scan_progress['queue'] = queue.Queue()
+    _scan_progress['active'] = True
+    _scan_progress['results'] = None
+    
+    # Función para ejecutar el escaneo en thread separado
+    def run_scan():
+        # IMPORTANTE: Usar contexto de aplicación Flask para acceso a DB
+        with current_app.app_context():
+            try:
+                # Enviar mensaje de inicio
+                _scan_progress['queue'].put({
+                    'type': 'start',
+                    'folder_path': str(path_obj),
+                    'scan_subdirs': scan_subdirs
+                })
+                
+                # Obtener extensiones de la base de datos
+                image_extensions = set()
+                video_extensions = set()
+                audio_extensions = set()
+                
+                if 'images' in file_types:
+                    image_types = FileType.query.filter_by(type='image').all()
+                    image_extensions = {ft.extension for ft in image_types}
+                
+                if 'videos' in file_types:
+                    video_types = FileType.query.filter_by(type='video').all()
+                    video_extensions = {ft.extension for ft in video_types}
+                
+                if 'audio' in file_types:
+                    audio_types = FileType.query.filter_by(type='audio').all()
+                    audio_extensions = {ft.extension for ft in audio_types}
+                
+                # Callback para actualizar progreso
+                start_time = time.time()
+                def progress_callback(totals):
+                    elapsed = time.time() - start_time
+                    _scan_progress['queue'].put({
+                        'type': 'progress',
+                        'totals': totals,
+                        'elapsed_seconds': int(elapsed)
+                    })
+                
+                # Ejecutar escaneo con callback
+                scan_results = scan_for_media_recursive(
+                    folder_path=str(path_obj),
+                    image_extensions=image_extensions,
+                    video_extensions=video_extensions,
+                    audio_extensions=audio_extensions,
+                    scan_subdirs=scan_subdirs,
+                    progress_callback=progress_callback
+                )
+                
+                # Calcular totales
+                totals = scan_results.get('totals', {})
+                total_files = sum(totals.values())
+                
+                # Guardar resultados
+                _scan_progress['results'] = {
+                    'status': 'ok',
+                    'folder_path': str(path_obj),
+                    'totals': totals,
+                    'by_extension': scan_results.get('by_extension', {}),
+                    'total_files': total_files,
+                    'total_size': scan_results.get('total_size', 0),
+                    'directories': scan_results.get('directories', [])
+                }
+                
+                # Enviar mensaje de finalización
+                _scan_progress['queue'].put({
+                    'type': 'complete',
+                    'results': _scan_progress['results']
+                })
+                
+            except Exception as e:
+                current_app.logger.error(f"Error scanning folder: {str(e)}")
+                import traceback
+                current_app.logger.error(traceback.format_exc())
+                _scan_progress['queue'].put({
+                    'type': 'error',
+                    'error': str(e)
+                })
+            finally:
+                _scan_progress['active'] = False
+    
+    # Iniciar thread de escaneo
+    scan_thread = threading.Thread(target=run_scan)
+    scan_thread.daemon = True
+    scan_thread.start()
+    
+    return jsonify({
+        'status': 'started',
+        'message': 'Escaneo iniciado. Conecta a /api/scan-progress para recibir actualizaciones'
+    }), 202
+
+
+@bp.route('/api/scan-results', methods=['GET'])
+def get_scan_results():
+    """Obtiene los resultados del último escaneo completado"""
+    if _scan_progress['results']:
+        return jsonify(_scan_progress['results'])
+    else:
+        return jsonify({'error': 'No hay resultados disponibles'}), 404
+
 
 @bp.route('/api/save-scan-summary', methods=['POST'])
 def save_scan_summary():

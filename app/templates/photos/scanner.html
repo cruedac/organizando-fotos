@@ -70,30 +70,13 @@
                             <i class="bi bi-hourglass-split"></i> Escaneo en progreso
                         </h5>
                     </div>
-                    <div class="card-body">
-                        <div class="progress mb-3">
-                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                                 role="progressbar" style="width: 0%">
-                                0%
-                            </div>
+                    <div class="card-body text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Cargando...</span>
                         </div>
-                        <div id="progressStats" class="row text-center">
-                            <div class="col">
-                                <small>Archivos encontrados</small>
-                                <h6 id="filesFound">0</h6>
-                            </div>
-                            <div class="col">
-                                <small>Imágenes</small>
-                                <h6 id="imagesCount">0</h6>
-                            </div>
-                            <div class="col">
-                                <small>Videos</small>
-                                <h6 id="videosCount">0</h6>
-                            </div>
-                            <div class="col">
-                                <small>Audio</small>
-                                <h6 id="audioCount">0</h6>
-                            </div>
+                        <div id="progressStats">
+                            <h4 id="elapsedTime">0s</h4>
+                            <p class="text-muted">Escaneando carpeta...</p>
                         </div>
                     </div>
                 </div>
@@ -199,16 +182,27 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Mostrar progreso
+        // Mostrar progreso con contador de tiempo
         scannerForm.style.display = 'none';
         progressContainer.style.display = 'block';
         resultsContainer.style.display = 'none';
 
-        // Ejecutar escaneo real
+        // Ejecutar escaneo simple con contador de tiempo
         performScan(folderPath, subdirs, fileTypes);
     });
 
+    let elapsedInterval = null;
+
     async function performScan(folderPath, scanSubdirs, fileTypes) {
+        const startTime = Date.now();
+        const elapsedTimeEl = document.getElementById('elapsedTime');
+        
+        // Iniciar contador de tiempo
+        elapsedInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            elapsedTimeEl.textContent = `${elapsed}s`;
+        }, 1000);
+
         try {
             const response = await fetch('/photos/api/scan-folder', {
                 method: 'POST',
@@ -226,42 +220,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const data = await response.json();
-            lastScanResults = data; // Guardar resultados
+            lastScanResults = data;
             
-            // Simular progreso visual
-            simulateProgress(data);
+            clearInterval(elapsedInterval);
+            showResults(data);
             
         } catch (error) {
+            clearInterval(elapsedInterval);
             console.error('Error:', error);
             alert('Error al escanear: ' + error.message);
             scannerForm.style.display = 'block';
             progressContainer.style.display = 'none';
         }
-    }
-
-    function simulateProgress(scanData) {
-        // Animación rápida de progreso
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 20;
-            if (progress > 100) progress = 100;
-
-            const progressBar = document.getElementById('progressBar');
-            progressBar.style.width = progress + '%';
-            progressBar.textContent = Math.round(progress) + '%';
-
-            // Actualizar estadísticas con datos reales
-            const totals = scanData.totals || {};
-            document.getElementById('filesFound').textContent = scanData.total_files || 0;
-            document.getElementById('imagesCount').textContent = totals.image || 0;
-            document.getElementById('videosCount').textContent = totals.video || 0;
-            document.getElementById('audioCount').textContent = totals.audio || 0;
-
-            if (progress >= 100) {
-                clearInterval(interval);
-                showResults(scanData);
-            }
-        }, 300);
     }
 
     function showResults(scanData) {

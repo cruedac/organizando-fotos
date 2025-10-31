@@ -1,5 +1,5 @@
 from app import db, create_app
-from app.models.photo_scan_summary import PhotoScanSummary
+from app.models.database import PhotoScanSummary
 from sqlalchemy import text
 
 def migrate_photos_scan_summary():
