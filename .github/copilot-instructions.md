@@ -6,7 +6,7 @@
   - Logging is preconfigured with a rotating handler that writes UTF-8 logs to `logs/app.log`; reuse the logger instead of printing when possible.
 
 - **Architecture Overview**
-  - Blueprints live in `app/routes/`: `main` (UI + directory scanning), `maintenance` (DB health, backups, exports), `tables` (dynamic schema builder), `videos` (legacy catalogue CRUD), `api` (JSON endpoints mirroring scanner features).
+  - Blueprints live in `app/routes/`: `main` (UI + directory scanning), `maintenance` (DB health, backups, exports), `tables` (dynamic schema builder), `videos` (legacy catalogue CRUD), `photos` (photo scanning, analysis, and summaries), `api` (JSON endpoints mirroring scanner features).
   - Business logic sits in `app/services/`; models are in `app/models/`. Keep route handlers thin—delegate new logic to a service when it spans multiple responsibilities.
 
 - **Persistence & Models**
@@ -19,8 +19,8 @@
   - Deletion safeguards: tables cannot drop if FK references exist or if they contain rows—respect this flow when building admin actions.
 
 - **Media Scanning Workflow**
-  - `scan_for_media_recursive` normalises extensions to lowercase and counts totals/by-extension; it honours the `scan_subdirs` flag by switching between `os.walk` and a shallow listing. Both `main.scan_directory` and `api.scan_folder` fetch extensions from the DB, so extend `FileType` entries before expecting new formats to be recognised.
-  - **Real-time progress**: `/scan-progress` endpoint uses Server-Sent Events (SSE) with threading and queue. The scan runs in a separate thread, pushing progress updates via `progress_callback` (every 5 files). The frontend uses fetch streaming API to receive events: 'start', 'progress', 'complete', 'error', and heartbeat signals.
+  - `scan_for_media_recursive` normalises extensions to lowercase and counts totals/by-extension; it honours the `scan_subdirs` flag by switching between `os.walk` and a shallow listing. Both `main.scan_directory`, `api.scan_folder`, and `photos.scan_folder` fetch extensions from the DB, so extend `FileType` entries before expecting new formats to be recognised.
+  - **Real-time progress**: `/scan-progress` and `/photos/api/scan-progress` endpoints use Server-Sent Events (SSE) with threading and queue. The scan runs in a separate thread, pushing progress updates via `progress_callback` (every 5 files). The frontend uses fetch streaming API to receive events: 'start', 'progress', 'complete', 'error', and heartbeat signals.
   - Windows drive and directory browsing for the UI lives in `main.list_drives` / `main.list_directory`; keep Windows path quirks in mind when accepting user input.
 
 - **Caching & Performance**
@@ -31,6 +31,11 @@
 - **Video Catalogue**
   - Field definitions for forms/detail views are centralised in `videos.py` (`MOVIE_FIELD_DEFINITIONS`). Any new field must be added there, to the template, and to the `Movie` model.
   - `VideoService.search_videos` composes filters with SQLAlchemy; reuse its helpers (`get_categories`, `get_media_types`, `get_years`) to keep dropdowns synchronized with DB contents.
+
+- **Photo Scanning**
+  - `PhotoScanSummary` model stores aggregated scan results; scans are saved to `photos_scan_summary` table with totals by media type.
+  - Real-time progress via SSE in `/photos/api/scan-progress`; scan runs in background thread with queue-based updates.
+  - Media metadata extraction via `app/services/media_metadata.py` for EXIF data, dimensions, and file properties.
 
 - **Maintenance Blueprint**
   - `_get_database_info` compiles live stats using `sqlalchemy.inspect` and drives the dashboard plus `/maintenance/stats.json`. Backup/export actions stream files using `send_file`; prefer returning buffers rather than touching disk when adding formats.
